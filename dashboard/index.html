@@ -1,16 +1,29 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>ZEROFACTOR | Security Intelligence</title><link rel="stylesheet" href="style.css"></head>
-<body><header><div><p class="eyebrow">INDEPENDENT SECURITY VALIDATION</p><h1>ZEROFACTOR</h1><p class="muted">Evidence-led repository assessment</p></div><label class="upload">Import JSON report <input id="reportFile" type="file" accept="application/json,.json"></label></header>
-<main><section class="notice" id="notice">No assessment loaded. Create a project and import a JSON assessment.</section>
-<section class="workspace panel"><div><h2>Projects and assessment history</h2><p class="muted small">Local browser workspace. Data remains in this browser unless exported.</p></div>
-<div class="controls"><label>Project <select id="projectSelect"></select></label><label>Local profile <select id="roleSelect"><option value="owner">Owner</option><option value="analyst">Analyst</option><option value="viewer">Viewer</option></select></label><button id="createProject">New project</button><button id="deleteProject" class="danger">Delete project</button></div>
-<div class="history"><h3>Assessment history</h3><div id="historyRows">No assessments yet.</div></div>
-<p class="warning">Security boundary: project data and role selection are browser-local and editable by the browser user. This is not server-side authentication, secure RBAC or tenant isolation. Do not use it for confidential multi-user assessments.</p></section>
-<section class="metrics"><article><span>Files examined</span><strong id="files">—</strong></article><article><span>Findings</span><strong id="findings">—</strong></article><article><span>Resolved packages</span><strong id="deps">—</strong></article><article><span>Coverage</span><strong id="coverage">—</strong></article><article><span>ZFI</span><strong id="zfi">—</strong></article></section>
-<section class="grid"><article class="panel"><h2>Findings by severity</h2><div id="severity" class="bars empty">Import a report.</div></article><article class="panel"><h2>Assessment coverage</h2><div id="checks" class="check-list empty">No checks loaded.</div></article></section>
-<section class="panel"><h2>Findings register</h2><div class="table-wrap"><table><thead><tr><th>Severity</th><th>Finding</th><th>Status</th><th>Location</th></tr></thead><tbody id="findingRows"><tr><td colspan="4">No data</td></tr></tbody></table></div></section>
-<section class="panel"><h2>Dependency inventory</h2><div class="table-wrap"><table><thead><tr><th>Ecosystem</th><th>Package</th><th>Version</th><th>Manifest</th></tr></thead><tbody id="depRows"><tr><td colspan="4">No data</td></tr></tbody></table></div></section>
-<section class="panel"><h2>Advisory matches</h2><div class="table-wrap"><table><thead><tr><th>Package</th><th>Resolved version</th><th>Advisories</th><th>Source lockfile</th></tr></thead><tbody id="advisoryRows"><tr><td colspan="4">No advisory data</td></tr></tbody></table></div></section>
-<section class="grid"><article class="panel"><h2>Evidence records</h2><div id="evidenceRows">No evidence records.</div></article><article class="panel"><h2>Measured impact</h2><div id="impactRows">No impact measurements.</div></article></section>
-<section class="panel"><h2>Warnings and limitations</h2><ul id="warnings"><li>Import a report.</li></ul></section></main>
-<footer>ZEROFACTOR · Local workspace · A clean static scan is not proof of security.</footer><script src="app.js"></script></body></html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>ZEROFACTOR | Security Intelligence</title><link rel="stylesheet" href="/dashboard/style.css"></head>
+<body>
+<header><div><p class="eyebrow">INDEPENDENT SECURITY VALIDATION</p><h1>ZEROFACTOR</h1><p class="muted">Plateforme de validation et de preuves de sécurité</p></div><div id="uploadWrap" hidden class="upload">Importer un rapport JSON <input id="reportFile" type="file" accept="application/json,.json"></div></header>
+<main>
+<section id="notice" class="notice">Connectez-vous pour accéder à vos projets et évaluations.</section>
+<section id="authPanel" class="panel auth-panel">
+ <h2>Accès à ZEROFACTOR</h2><p class="muted small">Les comptes et projets sont gérés par le serveur local.</p>
+ <div class="auth-grid">
+  <form id="loginForm"><h3>Connexion</h3><label>E-mail<input id="loginEmail" type="email" autocomplete="username" required></label><label>Mot de passe<input id="loginPassword" type="password" autocomplete="current-password" required></label><button type="submit">Se connecter</button></form>
+  <form id="registerForm"><h3>Créer un compte</h3><label>E-mail<input id="registerEmail" type="email" autocomplete="email" required></label><label>Mot de passe (12 caractères minimum)<input id="registerPassword" type="password" minlength="12" autocomplete="new-password" required></label><button type="submit" class="secondary">Créer le compte</button></form>
+ </div>
+</section>
+<div id="appShell" hidden>
+ <section class="workspace panel"><div class="account-row"><div><h2>Projets et historique</h2><p id="accountEmail" class="muted small"></p></div><button id="logoutButton" class="secondary">Déconnexion</button></div>
+  <div class="controls"><label>Projet <select id="projectSelect"></select></label><button id="createProject">Nouveau projet</button><button id="deleteProject" class="danger">Supprimer le projet</button></div>
+  <div class="history"><h3>Historique des évaluations</h3><div id="historyRows">Aucune évaluation.</div></div>
+  <div class="member-tools"><h3>Membres du projet</h3><form id="memberForm"><label>E-mail du membre<input id="memberEmail" type="email" required></label><label>Rôle<select id="memberRole"><option value="analyst">Analyste</option><option value="viewer">Lecteur</option></select></label><button type="submit" id="addMember">Ajouter</button></form><p class="muted small">Seul le propriétaire du projet peut gérer les membres.</p></div>
+ </section>
+ <section class="metrics"><article><span>Fichiers examinés</span><strong id="files">—</strong></article><article><span>Constats</span><strong id="findings">—</strong></article><article><span>Paquets résolus</span><strong id="deps">—</strong></article><article><span>Couverture</span><strong id="coverage">—</strong></article><article><span>ZFI</span><strong id="zfi">—</strong></article></section>
+ <section class="grid"><article class="panel"><h2>Constats par sévérité</h2><div id="severity" class="bars empty">Importez un rapport.</div></article><article class="panel"><h2>Couverture de l'évaluation</h2><div id="checks" class="check-list empty">Aucun contrôle chargé.</div></article></section>
+ <section class="panel"><h2>Registre des constats</h2><div class="table-wrap"><table><thead><tr><th>Sévérité</th><th>Constat</th><th>État</th><th>Emplacement</th></tr></thead><tbody id="findingRows"><tr><td colspan="4">Aucune donnée</td></tr></tbody></table></div></section>
+ <section class="panel"><h2>Inventaire des dépendances</h2><div class="table-wrap"><table><thead><tr><th>Écosystème</th><th>Paquet</th><th>Version</th><th>Fichier lock</th></tr></thead><tbody id="depRows"><tr><td colspan="4">Aucune donnée</td></tr></tbody></table></div></section>
+ <section class="panel"><h2>Avis de vulnérabilité</h2><div class="table-wrap"><table><thead><tr><th>Paquet</th><th>Version résolue</th><th>Avis</th><th>Fichier source</th></tr></thead><tbody id="advisoryRows"><tr><td colspan="4">Aucun avis</td></tr></tbody></table></div></section>
+ <section class="grid"><article class="panel"><h2>Preuves</h2><div id="evidenceRows">Aucune preuve.</div></article><article class="panel"><h2>Impact mesuré</h2><div id="impactRows">Aucune mesure.</div></article></section>
+ <section class="panel"><h2>Avertissements et limites</h2><ul id="warnings"><li>Importez un rapport.</li></ul></section>
+ <p class="warning">Les autorisations et rôles sont appliqués par le serveur local. Ce backend reste destiné au développement sur localhost ; ne l'exposez pas sur Internet.</p>
+</div>
+</main><footer>ZEROFACTOR · Validation indépendante · Un scan statique propre n'est pas une preuve de sécurité.</footer><script src="/dashboard/app.js"></script></body></html>
