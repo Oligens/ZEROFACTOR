@@ -27,14 +27,16 @@
 - [x] Written module contracts for AUTH, INPUT, FILE, TLS, RATE and RECOVERY
 - [x] JSON Schema for explicit authorization scope, target hosts, modules and budgets
 - [x] Runtime fail-closed scope validation before any network operation
-- [ ] Authentication/authorization read-only test module with synthetic identities
-- [ ] Benign input-validation boundary module
-- [ ] Read-only file metadata/access module
-- [x] One-shot TLS certificate and protocol verification module (unit-tested with a synthetic handshake)
-- [ ] Conservative rate-limit observation module
-- [ ] Operator-supervised recovery observation module
-- [ ] Local synthetic fixtures, cancellation, cleanup and regression tests for every module
-- [ ] gVisor-gated execution and reproducible evidence capture
+- [x] AUTH offline synthetic evaluator for unauthenticated and role/project authorization decisions
+- [x] INPUT offline synthetic evaluator for benign schema boundaries
+- [x] FILE offline synthetic evaluator for fixture access and metadata policy
+- [x] RATE offline evaluator for pre-existing, spaced observations only
+- [x] RECOVERY offline evaluator for operator snapshots, health and recovery objectives
+- [x] TLS one-shot certificate and protocol verification (unit-tested with a synthetic handshake)
+- [x] Synthetic fixture regression tests and redacted evidence output for all five evaluators
+- [ ] Live module adapters gated on independently validated gVisor host isolation
+- [ ] VM/firewall egress policy and DNS-rebinding-resistant destination controls
+- [ ] Cancellation, cleanup and live-runner integration tests
 
 ## Phase 4 — Rust evidence engine and reporting
 - [x] Typed evidence records and impact measurement structures
@@ -60,4 +62,4 @@
 - [ ] Independent production security review and deployment hardening
 
 ## Release gates
-A feature is not complete until automated tests pass, security controls are independently verified, artifacts are reproducible and limitations are explicit. A launcher does not prove host isolation; an advisory match does not prove exploitability; browser-side role selection is not secure RBAC. No controlled dynamic module is operational until the dedicated gVisor host validation is complete.
+A feature is not complete until automated tests pass, security controls are independently verified, artifacts are reproducible and limitations are explicit. Offline fixture evaluators are not live tests. A launcher does not prove host isolation; an advisory match does not prove exploitability; browser-side role selection is not secure RBAC. No controlled dynamic module is operational until the dedicated gVisor host validation is complete.

@@ -1,0 +1,49 @@
+{
+  "module": "INPUT",
+  "case_id": "input-synthetic-boundaries",
+  "constraints": [
+    {
+      "field_id": "display-name",
+      "type": "string",
+      "required": true,
+      "min_length": 1,
+      "max_length": 32
+    },
+    {
+      "field_id": "page-size",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    }
+  ],
+  "observations": [
+    {
+      "case_id": "valid-name",
+      "field_id": "display-name",
+      "value_type": "string",
+      "length": 12,
+      "observed_accepted": true
+    },
+    {
+      "case_id": "overlong-name",
+      "field_id": "display-name",
+      "value_type": "string",
+      "length": 33,
+      "observed_accepted": false
+    },
+    {
+      "case_id": "valid-page-size",
+      "field_id": "page-size",
+      "value_type": "integer",
+      "integer_value": 50,
+      "observed_accepted": true
+    },
+    {
+      "case_id": "too-large-page-size",
+      "field_id": "page-size",
+      "value_type": "integer",
+      "integer_value": 101,
+      "observed_accepted": false
+    }
+  ]
+}

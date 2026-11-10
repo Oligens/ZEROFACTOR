@@ -1,0 +1,24 @@
+{
+  "module": "FILE",
+  "case_id": "file-synthetic-access",
+  "observations": [
+    {
+      "fixture_id": "public-avatar",
+      "expected_access": "allow",
+      "observed_access": "allow",
+      "declared_bytes": 1024,
+      "max_bytes": 4096,
+      "content_type_allowed": true,
+      "extension_allowed": true
+    },
+    {
+      "fixture_id": "private-document",
+      "expected_access": "deny",
+      "observed_access": "deny",
+      "declared_bytes": 2048,
+      "max_bytes": 4096,
+      "content_type_allowed": true,
+      "extension_allowed": true
+    }
+  ]
+}

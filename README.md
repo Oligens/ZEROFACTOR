@@ -8,9 +8,9 @@ ZEROFACTOR evaluates whether security guarantees declared by a system are suppor
 
 ## Current status
 
-The repository inventory MVP and dependency/advisory foundations are merged into `main`. The current feature branch adds npm v1 and Yarn classic graph adapters, a fail-closed advisory severity/freshness policy, bounded HTTPS posture checks, typed Rust evidence aggregation, and a server-backed local dashboard with authentication and project-scoped roles.
+The repository inventory MVP and dependency/advisory foundations are merged into `main`. The platform includes bounded HTTPS posture checks, typed Rust evidence aggregation and a server-backed local dashboard with authentication and project-scoped roles.
 
-**These additions are not a claim that all platform objectives are complete.** Native graph coverage remains incomplete for pnpm, Yarn Berry, Maven, Bundler and other ecosystems; Gradle lockfiles are inventory-only. Python constraints are not fully evaluated; Pipfile.lock and go.sum are inventory-only. CVE freshness enforcement requires trusted upstream source metadata and currently gates OSV only; RustSec remains a separate audit. The gVisor host workflow has not been executed on a dedicated host. Controlled checks are passive HTTP posture checks, not a general penetration-testing engine. Production multi-user deployment and independently verified sandbox escape resistance remain future work.
+**These additions are not a claim that all platform objectives are complete.** Native graph coverage remains incomplete for pnpm, Yarn Berry, Maven, Bundler and other ecosystems; Gradle lockfiles are inventory-only. Python constraints are not fully evaluated; Pipfile.lock and go.sum are inventory-only. CVE freshness enforcement requires trusted upstream source metadata and currently gates OSV only; RustSec remains a separate audit. The gVisor host workflow has not been executed on a dedicated host. AUTH, INPUT, FILE, RATE and RECOVERY currently evaluate synthetic fixtures only, not live targets. Production multi-user deployment and independently verified sandbox escape resistance remain future work.
 
 ## Quick start
 
@@ -23,17 +23,12 @@ cargo run -- scan --path ../atibon --format json --evidence reports/evidence.jso
 ```
 
 Lockfile inventory:
+
 ```bash
 python3 scripts/dependency_graph.py ../atibon --output reports/dependency-graph.json
 ```
-Review `graph_complete` and `limitations`; do not assume that a partial inventory is a complete graph.
 
-Advisory policy (requires trusted source metadata):
-```bash
-python3 scripts/normalize_osv.py osv-results.json --output advisory-results.json
-python3 scripts/cve_policy.py advisory-results.json --source-metadata source-metadata.json --output cve-policy-result.json
-```
-The scan time and per-advisory modified timestamp are not a database freshness timestamp. Do not fabricate `source-metadata.json`.
+Review `graph_complete` and `limitations`; do not assume a partial inventory is a complete graph.
 
 ## Local dashboard API
 
@@ -41,15 +36,32 @@ The scan time and per-advisory modified timestamp are not a database freshness t
 python3 server/app.py
 python3 -m unittest discover -s server -p 'test_*.py'
 ```
+
 Open `http://127.0.0.1:8765/`. Accounts, project memberships, assessment history and roles are stored in SQLite. Roles are Owner, Analyst and Viewer. The API binds to loopback only and is not production-ready for public exposure.
 
 ## Controlled checks
 
+Run the complete Python suite:
+
 ```bash
 python3 -m unittest discover -s scripts -p 'test_*.py'
-cp scripts/http-scope.example.json scripts/http-scope.json\n# Edit scripts/http-scope.json with written authorization and the exact HTTPS host.\npython3 scripts/controlled_tests.py --scope scripts/http-scope.json --checks security_headers cookie_flags --output reports/http-checks.json
 ```
-The HTTP runner requires an unexpired authorization scope, exact HTTPS host allowlisting and uses GET-only passive checks. See [controlled testing](docs/CONTROLLED_TESTING.md).
+
+Copy the example scope and edit it only with written authorization:
+
+```bash
+cp scripts/controlled-scope.example.json scripts/controlled-scope.json
+```
+
+The example is intentionally unauthorized. Set `authorized` to `true` only after replacing the authorization ID and owner with valid written authorization details. Then run an offline evaluator:
+
+```bash
+python3 scripts/controlled_modules.py --module AUTH --scope scripts/controlled-scope.json --fixture fixtures/controlled/auth.json --output reports/auth.json
+```
+
+Supported offline modules: AUTH, INPUT, FILE, RATE and RECOVERY. They make zero network connections and read no target files. RATE's example is expected to return `inconclusive` because a small unthrottled sample cannot prove that rate limiting is absent. See [controlled testing](docs/CONTROLLED_TESTING.md), [module contracts](docs/CONTROLLED_MODULES.md) and [synthetic fixture examples](fixtures/controlled/README.md).
+
+The separate HTTP posture runner requires an unexpired authorization scope, exact HTTPS host allowlisting and GET-only passive checks. Do not run it against a system without written authorization.
 
 ## Isolated execution
 
