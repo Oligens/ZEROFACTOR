@@ -49,7 +49,9 @@ def run(scope_path, output, selected):
     target_fingerprint=hashlib.sha256((parsed.scheme+"://"+parsed.netloc).encode()).hexdigest()
     records=[]
     for c in checks:
-        records.append({"evidence_id":str(uuid.uuid4()),"assessment_id":scope.get("assessment_id","controlled-http"),"test_id":c["test_id"],"classification":"reproduced" if c["result"]=="fail" else "static","scope":{"authorization_id":scope["authorization_id"],"target_fingerprint":target_fingerprint,"expires_at":scope["expires_at"]},"observed_at":dt.datetime.now(dt.timezone.utc).isoformat(),"result":c["result"],"finding_id":scope.get("finding_ids",{}).get(c["test_id"]),"impact":c["impact"],"observed":json.dumps(c["observed"],sort_keys=True),"integrity":{"sha256":digest,"artifact_uri":str(artifact)}})
+        record={"evidence_id":str(uuid.uuid4()),"assessment_id":scope.get("assessment_id","controlled-http"),"test_id":c["test_id"],"classification":"reproduced" if c["result"]=="fail" else "static","scope":{"authorization_id":scope["authorization_id"],"target_fingerprint":target_fingerprint,"expires_at":scope["expires_at"]},"observed_at":dt.datetime.now(dt.timezone.utc).isoformat(),"result":c["result"],"finding_id":scope.get("finding_ids",{}).get(c["test_id"]),"impact":c["impact"],"observed":json.dumps(c["observed"],sort_keys=True),"integrity":{"sha256":digest,"artifact_uri":str(artifact)}}
+        if record["finding_id"] is None: del record["finding_id"]
+        records.append(record)
     result={"target_origin":parsed.scheme+"://"+parsed.netloc,"http_status":status,"duration_ms":elapsed_ms,"checks":checks,"evidence_records":records,"safety":{"methods":["GET"],"redirects_followed":False,"body_limit_bytes":MAX_BODY,"no_exploit_payloads":True}}
     pathlib.Path(output).write_text(json.dumps(result,indent=2)+"\n")
     print(f"checks={len(checks)} failed={sum(x['result']=='fail' for x in checks)} evidence={len(records)}")
