@@ -8,9 +8,9 @@ ZEROFACTOR evaluates whether security guarantees declared by a system are suppor
 
 ## Current status
 
-The repository intelligence MVP is merged into main. This feature branch adds the first security-platform foundations: CI dependency/advisory checks, SPDX and CycloneDX SBOM artifact generation, a guarded gVisor execution launcher, impact/evidence methodology, and a local JSON dashboard.
+The repository intelligence MVP is merged into main. The current feature branch adds dependency lockfile graph extraction, OSV advisory normalization, a manual gVisor host smoke-test workflow, a structured evidence/impact schema and local project/history dashboard foundations.
 
-**These additions are foundations, not a claim that all eight platform objectives are complete.** The local scanner still parses selected direct dependency declarations only. Complete transitive resolution, complete cross-ecosystem CVE coverage, reachability analysis, verified exploitability, production-grade sandbox orchestration, active penetration-test modules, measured attack impact, and a hosted multi-user dashboard remain incomplete and require validation.
+**These additions are not a claim that all platform objectives are complete.** Native graph extraction currently covers Cargo and npm dependency edges, with partial exact-version inventory for Poetry, uv, Pipfile and Go checksums. OSV-Scanner provides additional ecosystem coverage using its supported lockfile extractors. Full cross-ecosystem graph completeness, multi-database CVE coverage, reachability analysis, verified exploitability, independent gVisor escape validation, production penetration-test modules, cryptographic evidence chain of custody and secure hosted multi-user RBAC remain incomplete.
 
 ## Quick start
 
@@ -22,52 +22,45 @@ cargo run -- scan --path ../atibon --format md --out reports/atibon-assessment.m
 cargo run -- scan --path ../atibon --format json --out reports/atibon-assessment.json
 ```
 
-Import the JSON report into dashboard/index.html to view local assessment metrics.
-
-## Security and supply-chain checks
-
-The GitHub Actions workflow in .github/workflows/security-supply-chain.yml runs cargo-audit, OSV-Scanner, and generates SPDX JSON and CycloneDX JSON SBOM artifacts. OSV-Scanner is currently non-blocking while its baseline is established. Review every advisory and generated SBOM; scanner coverage is ecosystem- and lockfile-dependent.
-
-Local tools:
+Lockfile graph inventory (Python 3.11+):
 
 ```bash
-cargo install cargo-audit --locked
-cargo audit
-osv-scanner scan source -r .
-syft dir:. -o spdx-json=sbom.spdx.json
-syft dir:. -o cyclonedx-json=sbom.cdx.json
+python3 scripts/dependency_graph.py ../atibon --output reports/dependency-graph.json
 ```
+
+The extractor does not install packages or execute target code. Review the graph_complete field and limitations before relying on the result.
+
+## Dependency and advisory checks
+
+CI runs cargo-audit, OSV-Scanner, and generates SPDX JSON and CycloneDX JSON SBOM artifacts. Exact package versions, advisory IDs/aliases, source lockfile and scanner exit code are retained as workflow artifacts. The current OSV baseline is report-first; advisory matches do not automatically prove reachability or exploitability.
+
+See [dependency intelligence](docs/DEPENDENCY_INTELLIGENCE.md) for supported lockfiles, database limitations and interpretation.
 
 ## Isolated execution
 
-sandbox/run-isolated.sh requires Docker with gVisor runsc registered and refuses default-runtime fallback. It enforces no network, read-only target/root filesystem, dropped capabilities, seccomp, no-new-privileges, unprivileged execution, and resource limits. It requires an explicit, unexpired scope file and prebuilt image. Use only disposable targets with written authorization. This launcher is not yet a production multi-tenant sandbox; validate isolation independently and prefer a dedicated VM/host.
+sandbox/run-isolated.sh requires Docker with gVisor runsc registered and refuses default-runtime fallback. It enforces no network, read-only target/root filesystem, dropped capabilities, seccomp, no-new-privileges, unprivileged execution and resource limits. It requires an explicit unexpired scope file and prebuilt image.
 
-## What the original static engine checks
+A manual GitHub workflow can run sandbox/verify-host.sh on a dedicated self-hosted Linux runner labelled gvisor. **The smoke test is not a sandbox escape certification.** Independent escape, side-channel and resource-exhaustion testing on a dedicated VM remains required.
 
-- Bounded local file inventory and top-level component classification.
-- Partial direct dependency declaration discovery for Cargo, npm, Python and Go.
-- Environment-file presence and possible hard-coded secret patterns, with redaction.
-- Selected source-level heuristics for unsafe APIs and validation patterns.
-- Findings with relative paths, line numbers, review status and recommendations.
-- JSON and Markdown reports, experimental weighted ZFI and explicit coverage.
+## Evidence and controlled testing
 
-## Evidence interpretation
+schemas/evidence.schema.json defines a record linking authorization scope, test ID, result classification, observed behavior, impact dimensions, cleanup and SHA-256 artifact integrity. Current dynamic verification is only a guarded sandbox foundation and host smoke test; a general-purpose penetration-test engine is not implemented.
 
-Dependency states must be distinguished: declared, resolved, advisory-matched, reachability-assessed, and exploitability-demonstrated. A CVE match is not proof of reachability or exploitation. Heuristic findings require human review.
+Only assess systems you own or are explicitly authorized to test. ZEROFACTOR never automatically modifies the assessed system.
 
-ZFI is an experimental evidence indicator, not a probability, certification, compliance attestation, or proof of security. A clean report with low coverage does not establish safety.
+## Dashboard
+
+Open dashboard/index.html for local report viewing, browser-local projects and assessment history. The current role selector is a local UI convenience, **not secure RBAC or authentication**. Server-side identity, permissions, tenant isolation and encrypted persistent storage remain future work. See [dashboard limitations](docs/DASHBOARD.md).
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Security model](docs/SECURITY_MODEL.md)
 - [Roadmap](docs/ROADMAP.md)
-- [Dependency intelligence and SBOM](docs/DEPENDENCY_INTELLIGENCE.md)
-- [Exploitability and impact methodology](docs/EXPLOITABILITY_AND_IMPACT.md)
+- [Dependency intelligence](docs/DEPENDENCY_INTELLIGENCE.md)
+- [Controlled testing and evidence](docs/CONTROLLED_TESTING.md)
 - [Sandbox instructions](sandbox/README.md)
 - [Dashboard instructions](docs/DASHBOARD.md)
-
-Only assess systems you own or are explicitly authorized to test. ZEROFACTOR never automatically modifies the assessed system.
 
 ## License
 
