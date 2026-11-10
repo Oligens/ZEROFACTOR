@@ -15,7 +15,7 @@ The contracts are design requirements, not implemented test handlers. Until a mo
 ## Safety model
 Dynamic checks are opt-in and must run only against disposable lab targets covered by unexpired written authorization. Current smoke tests are infrastructure checks, not a penetration-test suite and not a sandbox escape certification. Never use production credentials or real user data.
 
-The current HTTP runner remains a small passive posture check. It does not yet execute the six Phase 3 modules. The dedicated gVisor host validation must pass before dynamic modules can be marked operational.
+The current HTTP runner remains a small passive posture check. It now requires a fail-closed scope with `authorized: true`, an owner, an unexpired timestamp, exact HTTPS hostname allowlisting and explicit `HTTP_POSTURE` module permission. It never persists response bodies; evidence stores their SHA-256 and redacted metadata only. This does not yet execute the six Phase 3 modules. Exact hostname allowlisting alone does not prevent DNS rebinding or control the resolved destination IP; enforce outbound network policy at the VM/firewall layer. The dedicated gVisor host validation must pass before dynamic modules can be marked operational.
 
 ## Host validation procedure
 1. Use a dedicated, patched Linux VM with Docker and gVisor runsc registered.
