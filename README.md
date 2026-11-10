@@ -8,7 +8,7 @@ ZEROFACTOR evaluates whether security guarantees declared by a system are suppor
 
 ## Current status
 
-**Phase 1 — Repository Intelligence MVP implemented on a feature branch.** This first engine performs bounded, local, read-only source inspection. It does not execute target code, clone repositories, install packages, contact remote services, or modify the target.
+**Phase 1 — Repository Intelligence MVP implemented on a feature branch.** The first engine performs bounded, local, read-only source inspection. It does not execute target code, clone repositories, install packages, contact remote services, or modify the target.
 
 ## Quick start
 
@@ -31,16 +31,16 @@ The scan target must be a local directory. Only scan repositories you own or are
 
 ## What the first engine checks
 
-- Bounded file inventory; skips common generated and vendored directories.
-- Common dependency manifest discovery (discovery only; no vulnerability database lookup yet).
+- Bounded local file inventory; skips common generated and vendored directories, symlinks, files over 1 MiB, and scans beyond the 20,000-file cap.
+- Direct dependency declaration discovery for common Cargo, npm, Python requirements/Pipfile and Go manifests. This is inventory only, not a vulnerability/advisory audit or complete transitive dependency graph.
 - Environment-file presence and possible hard-coded secret patterns; values are redacted in reports.
 - Selected source-level heuristics for unsafe C string APIs, shell execution, dynamic evaluation, HTML insertion and disabled TLS verification.
-- Evidence with stable IDs, relative paths, line numbers, review status and remediation guidance.
-- JSON and Markdown reports, preliminary weighted ZFI and test coverage.
+- Evidence with stable IDs, relative paths, line numbers, review status, redacted evidence and remediation guidance.
+- JSON and Markdown reports, experimental weighted ZFI and explicit test coverage.
 
 ## Interpreting ZFI and coverage
 
-The experimental ZFI is calculated from explicitly recorded weighted check failures over tested check weight. Coverage is tested weight over all declared check weight. Heuristic matches are marked `needs_review` and do not automatically count as confirmed failures. Untested dependency, runtime and sandbox checks reduce coverage; they must never be interpreted as passing.
+The experimental ZFI is calculated from explicitly recorded weighted check failures over tested check weight. Coverage is tested weight over all declared check weight. The ZFI is reported as unavailable until a confirmed source-level failure is recorded. Heuristic matches are marked `needs_review` and do not automatically count as confirmed failures. Untested dependency advisory, runtime and sandbox checks reduce coverage; they must never be interpreted as passing.
 
 ZFI is not a probability, certification, compliance attestation, or proof of security. A low score with low coverage is not evidence that a system is safe.
 
