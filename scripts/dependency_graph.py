@@ -293,7 +293,7 @@ def resolve_locator(name, spec, index):
     spec=str(spec or "").strip()
     if spec.startswith(("workspace:","link:","file:","portal:")):
         return None
-    wanted=spec.split("(",1)[0].split("_",1)[0]
+    wanted=spec.split("(",1)[0].split("_",1)[0]\n    if wanted.startswith("npm:"):wanted=wanted[4:]
     exact=[]
     for item in candidates:
         version=str(item.get("version",""))
@@ -390,7 +390,7 @@ def maven_tree(path):
             depth=len(match.group("prefix"))//3+1;raw=match.group("coord").strip()
         else:
             # Maven's root coordinate is printed without a tree branch.
-            if stack or not re.match(r"^[^ ]+:[^ ]+:[^ ]+:[^ ]+:[^ ]+$",value):continue
+            if not re.match(r"^[^ ]+:[^ ]+:[^ ]+:[^ ]+:[^ ]+$",value):continue
             depth=0;raw=value
         parts=raw.split(":")
         if len(parts)<4:continue
@@ -449,7 +449,7 @@ def extract(path):
     if n=="pnpm-lock.yaml":return pnpm_lock(path)
     if n=="maven-dependency-tree.txt":return maven_tree(path)
     if n=="gradle-dependencies.txt":return gradle_report(path)
-    if n=="yarn.lock":return yarn_classic(path)
+    if n=="yarn.lock":return yarn_berry(path) if "__metadata:" in path.read_text(errors="replace") else yarn_classic(path)
     if n in ("poetry.lock","uv.lock"):return python_toml(tomllib.loads(path.read_text()),n)
     if n=="Pipfile.lock":return pipfile(json.loads(path.read_text()))
     if n=="go.sum":return go_sum(path)
