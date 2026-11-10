@@ -65,7 +65,7 @@ def run(scope_path, output, connect=socket.create_connection, context_factory=ss
         "details":details,
         "safety":{"handshakes":1,"application_data_sent":False,"minimum_tls":"1.2","certificate_verification":"enabled"},
     }
-    pathlib.Path(output).write_text(json.dumps(payload,indent=2)+"\\n",encoding="utf-8")
+    pathlib.Path(output).write_text(json.dumps(payload,indent=2)+"\n",encoding="utf-8")
     print(f"module=TLS result={result} host_fingerprint={hashlib.sha256(host.encode()).hexdigest()}")
     return 0 if result=="pass" else 1 if result=="fail" else 2
 
