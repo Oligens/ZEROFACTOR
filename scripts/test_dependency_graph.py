@@ -26,6 +26,34 @@ class LockGraphTests(unittest.TestCase):
   lock='foo@^1.0.0:\n  version "1.2.0"\n  dependencies:\n    bar "^2.0.0"\n\nbar@^2.0.0:\n  version "2.1.0"\n'
   d=self.run_script({"yarn.lock":lock})
   self.assertEqual(next(x for x in d["packages"] if x["name"]=="foo")["dependencies"],["bar@2.1.0"])
+ def test_yarn_berry_edges(self):
+  lock='"__metadata":\n  version: 6\n  cacheKey: 8\n\n"foo@npm:^1.0.0":\n  version: 1.2.0\n  resolution: "foo@npm:1.2.0"\n  dependencies:\n    bar: "npm:^2.0.0"\n\n"bar@npm:^2.0.0":\n  version: 2.1.0\n  resolution: "bar@npm:2.1.0"\n'
+  d=self.run_script({"yarn.lock":lock})
+  self.assertEqual(next(x for x in d["packages"] if x["name"]=="foo")["dependencies"],["bar@2.1.0"])
+ def test_pnpm_v9_snapshots(self):
+  lock='lockfileVersion: "9.0"\nimporters:\n  .:\n    dependencies:\n      foo:\n        specifier: ^1.0.0\n        version: 1.2.0\npackages:\n  foo@1.2.0:\n    resolution:\n      integrity: sha512-test\n  bar@2.1.0:\n    resolution:\n      integrity: sha512-test\nsnapshots:\n  foo@1.2.0:\n    dependencies:\n      bar: 2.1.0\n  bar@2.1.0: {}\n'
+  d=self.run_script({"pnpm-lock.yaml":lock})
+  self.assertEqual(next(x for x in d["packages"] if x["name"]=="foo")["dependencies"],["bar@2.1.0"])
+  self.assertTrue(d["graph_complete"])
+ def test_maven_dependency_tree_report(self):
+  report='[INFO] com.example:app:jar:1.0:compile\n[INFO] +- org.example:lib:jar:2.0:compile\n[INFO] |  \\- org.example:core:jar:3.0:runtime\n'
+  d=self.run_script({"pom.xml":"<project/>","maven-dependency-tree.txt":report})
+  app=next(x for x in d["packages"] if x["name"]=="com.example:app")
+  lib=next(x for x in d["packages"] if x["name"]=="org.example:lib")
+  self.assertEqual(app["dependencies"],["org.example:lib@2.0"])
+  self.assertEqual(lib["dependencies"],["org.example:core@3.0"])
+  self.assertTrue(d["graph_complete"])
+ def test_gradle_dependency_report_and_lock(self):
+  report='runtimeClasspath - Runtime classpath\n+--- org.example:lib:1.0 -> 1.2\n|    \\--- org.example:core:2.0\n\\--- org.example:util:3.0\n'
+  lock='org.example:lib=1.2\norg.example:core=2.0\norg.example:util=3.0\n'
+  d=self.run_script({"gradle.lockfile":lock,"gradle-dependencies.txt":report})
+  lib=next(x for x in d["packages"] if x["name"]=="org.example:lib")
+  self.assertEqual(lib["version"],"1.2")
+  self.assertEqual(lib["dependencies"],["org.example:core@2.0"])
+  self.assertTrue(d["graph_complete"])
+ def test_gradle_lock_without_report_is_incomplete(self):
+  d=self.run_script({"gradle.lockfile":"org.example:lib=1.2\n"})
+  self.assertFalse(d["graph_complete"])
  def test_composer_transitive_edge(self):
   lock={"packages":[{"name":"vendor/app","version":"1.0.0","require":{"vendor/lib":"^2.0.0"}},{"name":"vendor/lib","version":"2.1.0","require":{}}]}
   d=self.run_script({"composer.lock":json.dumps(lock)})
