@@ -30,7 +30,7 @@
 - [ ] Authentication/authorization read-only test module with synthetic identities
 - [ ] Benign input-validation boundary module
 - [ ] Read-only file metadata/access module
-- [ ] TLS certificate and protocol verification module
+- [x] One-shot TLS certificate and protocol verification module (unit-tested with a synthetic handshake)
 - [ ] Conservative rate-limit observation module
 - [ ] Operator-supervised recovery observation module
 - [ ] Local synthetic fixtures, cancellation, cleanup and regression tests for every module
