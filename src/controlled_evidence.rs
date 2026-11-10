@@ -21,6 +21,10 @@ fn required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value.get(key).and_then(Value::as_str).filter(|s| !s.trim().is_empty())
         .ok_or_else(|| format!("controlled result missing valid {key}"))
 }
+fn valid_case_id(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 96 &&
+        value.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':'))
+}
 fn result_value(value: &Value) -> Result<EvidenceResult, String> {
     match required_string(value, "result")? {
         "pass" => Ok(EvidenceResult::Pass),
@@ -45,6 +49,7 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
     let module = required_string(&value, "module")?.to_string();
     if !MODULES.contains(&module.as_str()) { return Err(format!("unsupported controlled module: {module}")); }
     let case_id = required_string(&value, "case_id")?.to_string();
+    if !valid_case_id(&case_id) { return Err("invalid controlled case_id".into()); }
     if required_string(&value, "evidence_kind")? != "synthetic_fixture" {
         return Err("controlled importer accepts synthetic_fixture results only".into());
     }
@@ -61,12 +66,14 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
     }
     let mut findings = Vec::new();
     let mut inconclusive = 0usize;
+    let mut staged_index = index.clone();
     for (position, raw) in records.iter().enumerate() {
         if required_string(raw, "module")? != module || required_string(raw, "classification")? != "synthetic_fixture" {
             return Err("evidence record module/classification does not match synthetic result envelope".into());
         }
         let evidence_id = required_string(raw, "evidence_id")?.to_string();
         let record_case = required_string(raw, "case_id")?.to_string();
+        if !valid_case_id(&record_case) { return Err("invalid evidence case_id".into()); }
         let authorization_id = required_string(raw, "authorization_id")?.to_string();
         let target_fingerprint = required_string(raw, "target_fingerprint")?.to_string();
         let observed_at = required_string(raw, "observed_at")?.to_string();
@@ -85,7 +92,10 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
             integrity: EvidenceIntegrity { sha256: digest.clone(), artifact_uri: Some(artifact.to_string_lossy().into_owned()) },
         };
         record.verify()?;
-        index.ingest(record)?;
+        if staged_index.records.iter().any(|existing| existing.evidence_id == record.evidence_id) {
+            return Err(format!("duplicate evidence_id: {}", record.evidence_id));
+        }
+        staged_index.ingest(record)?;
         match result {
             EvidenceResult::Fail => {
                 let reason = required_string(check, "reason")?;
@@ -103,6 +113,7 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
             EvidenceResult::Pass | EvidenceResult::NotRun => {}
         }
     }
+    *index = staged_index;
     Ok(ControlledImport { records: records.len(), findings, inconclusive, module, case_id })
 }
 
