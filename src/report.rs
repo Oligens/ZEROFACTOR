@@ -3,7 +3,8 @@ use std::fmt::Write;
 
 pub fn markdown(a: &Assessment) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "# ZEROFACTOR Repository Assessment\n");
+    let _ = writeln!(out, "# ZEROFACTOR Repository Inventory Report\n");
+    let _ = writeln!(out, "> **Assessment scope: inventory and preliminary static inspection only.** This report is not a CVE audit, complete transitive dependency analysis, runtime test, or sandbox result.\n");
     let _ = writeln!(out, "- **Target:** `{}`", a.root.display());
     let _ = writeln!(out, "- **Files examined:** {}", a.files_examined);
     let _ = writeln!(out, "- **Files skipped:** {}", a.files_skipped);
@@ -60,7 +61,7 @@ pub fn json(a: &Assessment) -> String {
         "{{\"id\":{},\"description\":{},\"weight\":{},\"tested\":{},\"failure_factor\":{}}}",
         q(&c.id), q(&c.description), c.weight, c.tested, c.failure_factor
     )).collect::<Vec<_>>().join(",");
-    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}]}}",
+    format!("{{\"assessment_scope\":\"repository_inventory_only\",\"dependency_scope\":\"partial_direct_declarations_only\",\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}]}}",
         q(&a.root.display().to_string()), a.files_examined, a.files_skipped, a.bytes_examined,
         a.zfi().map(|v| v.to_string()).unwrap_or_else(|| "null".into()), a.coverage(), components, dependencies, findings, checks,
         a.warnings.iter().map(|w| q(w)).collect::<Vec<_>>().join(","))
