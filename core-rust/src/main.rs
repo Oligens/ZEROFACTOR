@@ -13,7 +13,7 @@ fn main() {
         Some("zfi-demo") => {
             let sample = [
                 GuaranteeAssessment { guarantee_id: "authentication".into(), weight: 3.0, outcome: GuaranteeOutcome::Resisted },
-                GuaranteeAssessment { guarantee_id: "input-validation".into(), weight: 2.0, outcome: GuaranteeOutcome::PartiallyInvalidated },
+                GuaranteeAssessment { guarantee_id: "input-validation".into(), weight: 2.0, outcome: GuaranteeOutcome::PartiallyInvalidated { fraction: 0.5 },
                 GuaranteeAssessment { guarantee_id: "audit-integrity".into(), weight: 3.0, outcome: GuaranteeOutcome::NotTested },
             ];
             match compute_zfi(&sample) {
