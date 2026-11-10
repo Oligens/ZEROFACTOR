@@ -21,6 +21,7 @@ fn main() {
                     println!("Illustrative ZFI: {:.3}", result.score);
                     println!("Assessed guarantees: {}", result.assessed_count);
                     println!("Not tested: {}", result.not_tested_count);
+                    println!("Coverage: {:.1}%", result.coverage_ratio * 100.0);
                     println!("Not-tested guarantees are excluded, never counted as resistant.");
                 }
                 Err(error) => eprintln!("Unable to calculate ZFI: {error:?}"),
