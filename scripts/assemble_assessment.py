@@ -36,6 +36,13 @@ def main():
   ids=m.get("advisory_ids") or ["UNKNOWN"]
   for advisory_id in ids:
    findings.append({"id":"ZF-ADVISORY-"+advisory_id,"category":"dependency_vulnerability","severity":m.get("severity_label","unknown"),"status":"needs_review","title":str(advisory_id)+" affects "+str(m.get("package")),"path":m.get("source_lockfile",""),"line":None,"evidence":"Exact resolved version "+str(m.get("resolved_version"))+" matched by OSV-Scanner","recommendation":"Review advisory range, fixed version, package reachability and remediation before assigning exploitability."})
+ for item in ev:
+  fid=item.get("finding_id")
+  if fid:
+   for finding in findings:
+    if finding.get("id")==fid:
+     finding.setdefault("evidence_records",[]).append(item["evidence_id"])
+     finding.setdefault("impact",[]).extend(item.get("impact",[]))
  impacts={}
  for item in ev:
   for impact in item.get("impact",[]):
