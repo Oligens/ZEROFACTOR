@@ -1,6 +1,6 @@
 # Isolated execution laboratory
 
-This is a guarded launcher, not a claim that a complete sandbox service is already operational.
+This is a guarded launcher and validation harness, not a claim that the complete sandbox service is already operational.
 
 Requirements:
 - Dedicated, disposable Linux VM with Docker and gVisor runsc registered.
@@ -8,10 +8,10 @@ Requirements:
 - Disposable target and explicit written authorization.
 - A one-job ephemeral GitHub Actions runner; Docker access is effectively host-root.
 
-The launcher refuses to fall back to default Docker isolation. It disables network,
-mounts the target read-only, uses a read-only root filesystem, drops capabilities,
-enables no-new-privileges and seccomp, runs unprivileged, and enforces CPU, memory,
-process and file-descriptor limits.
+The launcher refuses to fall back to default Docker isolation. It disables container
+networking, mounts the target read-only, uses a read-only root filesystem, drops
+capabilities, enables no-new-privileges and seccomp, runs unprivileged, and enforces
+CPU, memory, process and file-descriptor limits.
 
 Copy scope.example.json and set authorized=true only after written authorization.
 Bind the exact canonical target path, exact image reference and expiry. The example
@@ -25,9 +25,16 @@ Never mount production secrets, host sockets, Docker socket, SSH agents or writa
 host directories. gVisor does not replace host patching, VM isolation or operational
 controls. Validate isolation independently before production use.
 
-## Provisioning the dedicated VM
+## VM provisioning and host validation
 
 Follow [VM_SETUP.md](VM_SETUP.md). The host-validation workflow is manual-only,
 main-branch-only, and requires approval through the `gvisor-lab-approval`
 environment. Because this repository is public, a private operations repository
 is the stronger long-term location for self-hosted runner orchestration.
+
+## Live read-only network observations
+
+The live adapter runs on the dedicated VM host, not inside the network-disabled
+gVisor container. It requires literal destination IPs and runs only after the host
+nftables verifier passes. The cloud security group/network ACL must enforce the same
+default-deny policy. See [egress firewall requirements](egress/README.md).

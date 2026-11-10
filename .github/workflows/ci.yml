@@ -27,4 +27,4 @@ jobs:
       - name: Validate dashboard JavaScript syntax
         run: node --check dashboard/app.js
       - name: Validate shell scripts
-        run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh
+        run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh sandbox/verify-egress-policy.sh

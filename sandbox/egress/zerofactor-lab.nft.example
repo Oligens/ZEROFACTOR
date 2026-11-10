@@ -1,0 +1,26 @@
+# TEMPLATE ONLY — review and populate approved_v4/approved_v6 before loading.
+# Apply only on a dedicated disposable VM with out-of-band console access.
+# This output policy affects every host process; it intentionally defaults to DROP.
+table inet zerofactor_lab {
+  set approved_v4 {
+    type ipv4_addr
+    flags interval
+    # Add exact target IPs plus current, reviewed GitHub Actions runner control-plane CIDRs.
+  }
+
+  set approved_v6 {
+    type ipv6_addr
+    flags interval
+    # Add exact target IPv6 addresses plus reviewed runner control-plane CIDRs, if used.
+  }
+
+  chain output {
+    type filter hook output priority filter
+    policy drop
+
+    oifname "lo" accept
+    ct state established,related accept
+    ip daddr @approved_v4 tcp dport 443 accept
+    ip6 daddr @approved_v6 tcp dport 443 accept
+  }
+}
