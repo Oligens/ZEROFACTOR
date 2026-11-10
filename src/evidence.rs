@@ -55,8 +55,8 @@ pub struct EvidenceRecord {
     pub integrity: EvidenceIntegrity,
 }
 
-/// A controlled-module failure is a review candidate, never an automatically confirmed
-/// vulnerability. Its evidence class remains Simulated for the current fixture runners.
+/// A failed controlled check is a review candidate, not an automatically confirmed
+/// vulnerability. Its evidence class records whether it was simulated or observed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControlledFinding {
     pub finding_id: String,
@@ -82,6 +82,7 @@ pub struct ModuleSummary {
     pub passed: usize,
     pub failed: usize,
     pub inconclusive: usize,
+    pub network_connections: usize,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -108,7 +109,7 @@ pub struct EvidenceIndex {
 
 impl EvidenceRecord {
     /// Structural and local artifact checks. This does not independently establish that
-    /// the authorization was genuine or that the target fingerprint was captured honestly.
+    /// authorization was genuine or that the target fingerprint was captured honestly.
     pub fn verify(&self) -> Result<(), String> {
         if self.evidence_id.len() < 8 || self.assessment_id.is_empty() || self.test_id.is_empty() {
             return Err("missing evidence identity".into());
@@ -160,8 +161,8 @@ impl EvidenceIndex {
         Ok(())
     }
 
-    /// Accept a legacy array/object of typed EvidenceRecord values or one versioned
-    /// controlled-module result. Import is transactional: a bad record imports nothing.
+    /// Accept typed evidence records or a versioned controlled-module result.
+    /// Import is transactional: invalid envelopes never leave partial evidence behind.
     pub fn load_json(&mut self, input: &str) -> Result<usize, String> {
         if input.len() > MAX_EVIDENCE_BYTES {
             return Err(format!("evidence input exceeds {MAX_EVIDENCE_BYTES} bytes"));
@@ -173,7 +174,7 @@ impl EvidenceIndex {
         } else {
             let records = value.as_array().cloned()
                 .or_else(|| value.get("evidence_records").and_then(Value::as_array).cloned())
-                .ok_or_else(|| "expected an array, a typed evidence_records object, or a versioned controlled-module result".to_string())?;
+                .ok_or_else(|| "expected an array, typed evidence_records object, or controlled-module result".to_string())?;
             let count = records.len();
             for item in records {
                 let record: EvidenceRecord = serde_json::from_value(item).map_err(|e| format!("invalid evidence record: {e}"))?;
@@ -193,18 +194,27 @@ impl EvidenceIndex {
         if !["AUTH", "INPUT", "FILE", "RATE", "RECOVERY"].contains(&module.as_str()) {
             return Err(format!("unsupported controlled module: {module}"));
         }
-        if required_string(doc, "evidence_kind")? != "synthetic_fixture" {
-            return Err("only synthetic_fixture evidence is accepted by this importer".into());
-        }
+        let evidence_kind = required_string(doc, "evidence_kind")?;
+        let evidence_class = match evidence_kind.as_str() {
+            "synthetic_fixture" => EvidenceClass::Simulated,
+            "controlled_observation" => EvidenceClass::Reproduced,
+            _ => return Err("unsupported controlled evidence_kind".into()),
+        };
         let safety = doc.get("safety").ok_or("missing safety metadata")?;
-        for key in ["network_connections", "target_files_read", "target_files_written", "credentials_used"] {
-            if safety.get(key).and_then(Value::as_u64) != Some(0) {
-                return Err(format!("unsafe or missing safety counter: {key}"));
-            }
+        let network_connections = safety.get("network_connections").and_then(Value::as_u64)
+            .ok_or("missing network_connections safety counter")? as usize;
+        if safety.get("target_files_read").and_then(Value::as_u64) != Some(0)
+            || safety.get("target_files_written").and_then(Value::as_u64) != Some(0)
+            || safety.get("credentials_used").and_then(Value::as_u64) != Some(0) {
+            return Err("controlled evidence reports forbidden target file or credential activity".into());
         }
-        let assessment_id = doc.get("assessment_id").and_then(Value::as_str)
-            .filter(|s| !s.trim().is_empty()).map(str::to_owned)
-            .unwrap_or_else(|| format!("assessment-{}", required_string(doc, "authorization_id").unwrap_or_default()));
+        if evidence_kind == "synthetic_fixture" && network_connections != 0 {
+            return Err("synthetic fixture evidence must report zero network connections".into());
+        }
+        if evidence_kind == "controlled_observation" && !(1..=MAX_CONTROLLED_RECORDS).contains(&network_connections) {
+            return Err("controlled observations require 1 to 12 bounded network connections".into());
+        }
+        let assessment_id = required_string(doc, "assessment_id")?;
         let authorization_id = required_string(doc, "authorization_id")?;
         if authorization_id.len() < 8 { return Err("authorization_id is too short".into()); }
         let expires_at = required_string(doc, "expires_at")?;
@@ -221,6 +231,9 @@ impl EvidenceIndex {
         if checks.is_empty() || checks.len() > MAX_CONTROLLED_RECORDS || checks.len() != evidence.len() {
             return Err("checks/evidence_records count mismatch or out of bounds".into());
         }
+        if evidence_kind == "controlled_observation" && network_connections != evidence.len() {
+            return Err("network connection count must equal the number of captured route observations".into());
+        }
         let mut ids = BTreeSet::new();
         let mut passed = 0usize;
         let mut failed = 0usize;
@@ -231,7 +244,7 @@ impl EvidenceIndex {
                 return Err(format!("duplicate evidence_id: {evidence_id}"));
             }
             if required_string(item, "module")? != module
-                || required_string(item, "classification")? != "synthetic_fixture"
+                || required_string(item, "classification")? != evidence_kind
                 || required_string(item, "authorization_id")? != authorization_id
                 || required_string(item, "target_fingerprint")? != target_fingerprint
                 || required_string(item, "observed_at")? != observed_at {
@@ -251,7 +264,21 @@ impl EvidenceIndex {
                 return Err("reason must be a short redacted machine identifier".into());
             }
             if required_string(item, "reason")? != reason { return Err("check/evidence reason mismatch".into()); }
-            match result { EvidenceResult::Pass => passed += 1, EvidenceResult::Fail => failed += 1, EvidenceResult::Inconclusive => inconclusive += 1, EvidenceResult::NotRun => return Err("not_run is not valid for an emitted evidence record".into()) }
+            if evidence_kind == "controlled_observation" {
+                let method = required_string(item, "method")?;
+                if !["GET", "HEAD"].contains(&method.as_str()) {
+                    return Err("controlled observation contains a non-read-only HTTP method".into());
+                }
+                if item.get("body").is_some() || item.get("response_body").is_some() {
+                    return Err("raw response bodies are forbidden in evidence".into());
+                }
+            }
+            match result {
+                EvidenceResult::Pass => passed += 1,
+                EvidenceResult::Fail => failed += 1,
+                EvidenceResult::Inconclusive => inconclusive += 1,
+                EvidenceResult::NotRun => return Err("not_run is not valid for an emitted evidence record".into()),
+            }
             let finding_id = if result == EvidenceResult::Fail {
                 Some(format!("ZF-{module}-{}", &format!("{:x}", Sha256::digest(format!("{module}:{case_id}").as_bytes()))[..12]))
             } else { None };
@@ -261,7 +288,7 @@ impl EvidenceIndex {
                 assessment_id: assessment_id.clone(),
                 test_id: format!("{module}:{case_id}"),
                 finding_id: finding_id.clone(),
-                classification: EvidenceClass::Simulated,
+                classification: evidence_class.clone(),
                 scope: EvidenceScope { authorization_id: authorization_id.clone(), target_fingerprint: target_fingerprint.clone(), expires_at: expires_at.clone() },
                 observed_at: observed_at.clone(),
                 result: result.clone(),
@@ -277,9 +304,9 @@ impl EvidenceIndex {
                     title: format!("{module} policy mismatch in case {case_id}"),
                     reason,
                     status: "needs_review".into(),
-                    classification: EvidenceClass::Simulated,
+                    classification: evidence_class.clone(),
                     evidence_id,
-                    recommendation: "Review the fixture, declared policy and source implementation; reproduce only in an approved isolated lab before confirming a vulnerability.".into(),
+                    recommendation: "Review the authorization, expected policy and source implementation; reproduce only in the approved isolated lab before confirming a vulnerability.".into(),
                 });
             }
         }
@@ -290,12 +317,13 @@ impl EvidenceIndex {
             assessment_id,
             authorization_id,
             result: derived.into(),
-            evidence_kind: "synthetic_fixture".into(),
+            evidence_kind,
             observed_at,
             cases: checks.len(),
             passed,
             failed,
             inconclusive,
+            network_connections,
         });
         Ok(checks.len())
     }
@@ -342,7 +370,7 @@ fn parse_result(value: &str) -> Result<EvidenceResult, String> {
 }
 
 fn looks_like_timestamp(value: &str) -> bool {
-    value.contains('T') && (value.ends_with('Z') || value.rfind(['+', '-']).map(|i| i > 10).unwrap_or(false))
+    value.contains('T') && (value.ends_with('Z') || value.rfind(|c| c == '+' || c == '-').map(|i| i > 10).unwrap_or(false))
 }
 
 #[cfg(test)]
@@ -360,20 +388,22 @@ mod tests {
         }
     }
 
-    fn controlled_fixture(result: &str, safety_network: u64) -> String {
-        let entry = serde_json::json!({
+    fn controlled_fixture(result: &str, evidence_kind: &str, network: u64) -> String {
+        let method = if evidence_kind == "controlled_observation" { Some("HEAD") } else { None };
+        let mut entry = serde_json::json!({
             "evidence_id":"fixture-evidence-0001","module":"AUTH","case_id":"private-profile",
-            "classification":"synthetic_fixture","result":result,"reason":if result=="fail" {"unexpected_status"} else {"unauthenticated_access_denied"},
+            "classification":evidence_kind,"result":result,"reason":if result=="fail" {"unexpected_status"} else {"unauthenticated_access_denied"},
             "authorization_id":"written-auth-1","target_fingerprint":"a".repeat(64),"observed_at":"2026-11-10T00:00:00Z"
         });
+        if let Some(m) = method { entry["method"] = Value::String(m.into()); }
         serde_json::json!({
             "schema_version":1,"module":"AUTH","case_id":"auth-fixture","assessment_id":"assessment-1",
             "authorization_id":"written-auth-1","expires_at":"2099-01-01T00:00:00Z",
             "target_fingerprint":"a".repeat(64),"observed_at":"2026-11-10T00:00:00Z",
-            "result":if result=="fail" {"fail"} else {"pass"},"evidence_kind":"synthetic_fixture",
+            "result":if result=="fail" {"fail"} else {"pass"},"evidence_kind":evidence_kind,
             "checks":[{"case_id":"private-profile","result":result,"reason":if result=="fail" {"unexpected_status"} else {"unauthenticated_access_denied"}}],
             "evidence_records":[entry],
-            "safety":{"network_connections":safety_network,"target_files_read":0,"target_files_written":0,"credentials_used":0}
+            "safety":{"network_connections":network,"target_files_read":0,"target_files_written":0,"credentials_used":0}
         }).to_string()
     }
 
@@ -399,9 +429,9 @@ mod tests {
     }
 
     #[test]
-    fn controlled_fixture_becomes_simulated_review_finding() {
+    fn synthetic_fixture_becomes_simulated_review_finding() {
         let mut index = EvidenceIndex::default();
-        assert_eq!(index.load_json(&controlled_fixture("fail", 0)).unwrap(), 1);
+        assert_eq!(index.load_json(&controlled_fixture("fail", "synthetic_fixture", 0)).unwrap(), 1);
         assert_eq!(index.records[0].classification, EvidenceClass::Simulated);
         assert_eq!(index.controlled_findings.len(), 1);
         assert_eq!(index.controlled_findings[0].status, "needs_review");
@@ -409,10 +439,18 @@ mod tests {
     }
 
     #[test]
+    fn read_only_network_observation_is_preserved_as_reproduced_evidence() {
+        let mut index = EvidenceIndex::default();
+        assert_eq!(index.load_json(&controlled_fixture("fail", "controlled_observation", 1)).unwrap(), 1);
+        assert_eq!(index.records[0].classification, EvidenceClass::Reproduced);
+        assert_eq!(index.module_summaries[0].network_connections, 1);
+    }
+
+    #[test]
     fn unsafe_controlled_artifact_is_rejected_atomically() {
         let mut index = EvidenceIndex::default();
-        let error = index.load_json(&controlled_fixture("fail", 1)).unwrap_err();
-        assert!(error.contains("network_connections"));
+        let error = index.load_json(&controlled_fixture("fail", "synthetic_fixture", 1)).unwrap_err();
+        assert!(error.contains("zero network"));
         assert!(index.records.is_empty());
         assert!(index.module_summaries.is_empty());
     }
