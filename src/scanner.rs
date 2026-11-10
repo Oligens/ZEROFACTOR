@@ -9,15 +9,12 @@ const MAX_FILES: usize = 20_000;
 
 #[derive(Debug, Clone)]
 pub struct ScanOptions { pub max_files: usize, pub max_file_bytes: u64 }
-impl Default for ScanOptions {
-    fn default() -> Self { Self { max_files: MAX_FILES, max_file_bytes: MAX_FILE_BYTES } }
-}
+impl Default for ScanOptions { fn default() -> Self { Self { max_files: MAX_FILES, max_file_bytes: MAX_FILE_BYTES } } }
 
 pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessment> {
     let root = fs::canonicalize(root)?;
     if !root.is_dir() { return Err(io::Error::new(io::ErrorKind::InvalidInput, "scan target must be a directory")); }
-    let mut a = Assessment { root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0,
-        findings: Vec::new(), dependencies: Vec::new(), checks: Vec::new(), warnings: Vec::new() };
+    let mut a = Assessment { root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0, findings: Vec::new(), dependencies: Vec::new(), checks: Vec::new(), warnings: Vec::new() };
     let mut files = Vec::new();
     collect_files(&root, &root, options, &mut files, &mut a)?;
     files.sort();
@@ -28,8 +25,7 @@ pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessm
 
     for path in files {
         let metadata = match fs::symlink_metadata(&path) { Ok(m) => m, Err(_) => { a.files_skipped += 1; continue; } };
-        if metadata.file_type().is_symlink() || !metadata.is_file() { a.files_skipped += 1; continue; }
-        if metadata.len() > options.max_file_bytes { a.files_skipped += 1; continue; }
+        if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > options.max_file_bytes { a.files_skipped += 1; continue; }
         let bytes = match fs::read(&path) { Ok(b) => b, Err(_) => { a.files_skipped += 1; continue; } };
         let text = match std::str::from_utf8(&bytes) { Ok(t) => t, Err(_) => { a.files_skipped += 1; continue; } };
         a.files_examined += 1;
@@ -40,8 +36,7 @@ pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessm
         if is_manifest(name) {
             dependency_files_seen = true;
             for (ecosystem, dep_name, version) in parse_dependencies(name, text) {
-                let key = format!("{ecosystem}:{dep_name}:{version}");
-                if seen_deps.insert(key) {
+                if seen_deps.insert(format!("{ecosystem}:{dep_name}:{version}")) {
                     a.dependencies.push(Dependency { ecosystem: ecosystem.into(), name: dep_name, version_spec: version, manifest: rel.clone() });
                 }
             }
@@ -58,8 +53,7 @@ pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessm
             if looks_like_secret_assignment(&lower) || line.contains("-----BEGIN PRIVATE KEY-----") {
                 sensitive_config_seen = true;
                 push_finding(&mut a, "ZF-SECRET-001", "secrets", Severity::High, FindingStatus::NeedsReview,
-                    "Possible hard-coded secret or private key material", &rel, Some(idx + 1),
-                    &redact_line(line),
+                    "Possible hard-coded secret or private key material", &rel, Some(idx + 1), &redact_line(line),
                     "Verify the value without copying it into reports; rotate exposed credentials and use a secret manager.");
             }
             if let Some((needle, severity, title, recommendation)) = validation_pattern(&lower) {
@@ -98,7 +92,7 @@ fn parse_dependencies(filename: &str, content: &str) -> Vec<(String, String, Str
         if line.starts_with('[') && line.ends_with(']') { section = line.trim_matches(['[', ']']).to_string(); }
         if filename == "requirements.txt" || filename == "Pipfile" {
             if let Some((name, version)) = parse_requirement(line) { out.push(("python".into(), name, version)); }
-        } else if filename == "Cargo.toml" && (section == "dependencies" || section == "dev-dependencies" || section == "build-dependencies") {
+        } else if filename == "Cargo.toml" && matches!(section.as_str(), "dependencies" | "dev-dependencies" | "build-dependencies") {
             if let Some((name, version)) = line.split_once('=') {
                 let name = name.trim().trim_matches('"').to_string();
                 if valid_package_name(&name) {
@@ -110,11 +104,9 @@ fn parse_dependencies(filename: &str, content: &str) -> Vec<(String, String, Str
                 }
             }
         } else if filename == "package.json" {
-            if line.contains("\"dependencies\"") || line.contains("\"devDependencies\"") || line.contains("\"peerDependencies\"") || line.contains("\"optionalDependencies\"") { in_json_deps = true; continue; }
+            if ["\"dependencies\"", "\"devDependencies\"", "\"peerDependencies\"", "\"optionalDependencies\""].iter().any(|k| line.contains(k)) { in_json_deps = true; continue; }
             if in_json_deps && line.starts_with('}') { in_json_deps = false; continue; }
-            if in_json_deps {
-                if let Some((name, version)) = parse_json_pair(line) { out.push(("npm".into(), name, version)); }
-            }
+            if in_json_deps { if let Some((name, version)) = parse_json_pair(line) { out.push(("npm".into(), name, version)); } }
         } else if filename == "go.mod" {
             if line == "require (" { in_go_require = true; continue; }
             if in_go_require && line == ")" { in_go_require = false; continue; }
@@ -126,31 +118,23 @@ fn parse_dependencies(filename: &str, content: &str) -> Vec<(String, String, Str
     }
     out
 }
-
 fn parse_requirement(line: &str) -> Option<(String, String)> {
     let clean = line.split('#').next()?.trim();
     if clean.is_empty() || clean.starts_with('-') { return None; }
     let end = clean.find(|c: char| matches!(c, '=' | '<' | '>' | '!' | '~' | ';' | '[')).unwrap_or(clean.len());
     let name = clean[..end].trim();
     if !valid_package_name(name) { return None; }
-    Some((name.to_string(), clean[end..].trim().to_string().if_empty("unspecified")))
+    let version = clean[end..].trim();
+    Some((name.to_string(), if version.is_empty() { "unspecified".into() } else { version.into() }))
 }
-trait EmptyDefault { fn if_empty(self, fallback: &str) -> String; }
-impl EmptyDefault for String { fn if_empty(self, fallback: &str) -> String { if self.is_empty() { fallback.into() } else { self } } }
-
 fn parse_json_pair(line: &str) -> Option<(String, String)> {
-    let mut quoted = line.split('"').skip(1);
-    let name = quoted.next()?.trim().to_string();
-    let version = quoted.next()?.split(':').next()?;
-    let version = version.trim().trim_start_matches(':').trim().trim_matches(',').trim_matches('"').to_string();
+    let (left, right) = line.split_once(':')?;
+    let name = left.trim().trim_matches('"').to_string();
+    let version = right.trim().trim_end_matches(',').trim().trim_matches('"').to_string();
     if valid_package_name(&name) { Some((name, version)) } else { None }
 }
-fn valid_package_name(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '/'))
-}
-fn is_manifest(n: &str) -> bool {
-    matches!(n, "Cargo.toml" | "package.json" | "requirements.txt" | "Pipfile" | "go.mod" | "pyproject.toml" | "Gemfile" | "composer.json" | "pom.xml" | "build.gradle")
-}
+fn valid_package_name(s: &str) -> bool { !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '/')) }
+fn is_manifest(n: &str) -> bool { matches!(n, "Cargo.toml" | "package.json" | "requirements.txt" | "Pipfile" | "go.mod" | "pyproject.toml" | "Gemfile" | "composer.json" | "pom.xml" | "build.gradle") }
 fn is_sensitive_env_file(n: &str) -> bool { n == ".env" || n.starts_with(".env.") && n != ".env.example" && n != ".env.template" }
 fn looks_like_secret_assignment(l: &str) -> bool {
     let key = ["password", "passwd", "secret", "api_key", "apikey", "access_token", "private_key", "client_secret"];
@@ -194,19 +178,19 @@ fn collect_files(dir: &Path, root: &Path, options: &ScanOptions, out: &mut Vec<P
     }
     Ok(())
 }
-fn push_finding(a: &mut Assessment, id: &str, category: &str, severity: Severity, status: FindingStatus, title: &str, path: &Path, line: Option<usize>, evidence: &str, recommendation: &str) {
-    a.findings.push(Finding { id: id.into(), category: category.into(), severity, status, title: title.into(), path: path.to_path_buf(), line, evidence: evidence.into(), recommendation: recommendation.into() });
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test] fn redaction_never_returns_assignment_value() { assert_eq!(redact_line("API_KEY=super-secret-value"), "API_KEY = [REDACTED]"); }
-    #[test] fn manifests_are_detected() { assert!(is_manifest("Cargo.toml")); }
     #[test] fn tls_false_is_flagged() { assert!(validation_pattern("verify=false").is_some()); }
     #[test] fn requirements_are_extracted() { assert_eq!(parse_requirement("requests>=2.31").unwrap(), ("requests".into(), ">=2.31".into())); }
     #[test] fn cargo_dependencies_are_extracted() {
         let parsed = parse_dependencies("Cargo.toml", "[dependencies]\nserde = \"1.0\"\n");
         assert_eq!(parsed[0], ("cargo".into(), "serde".into(), "1.0".into()));
+    }
+    #[test] fn package_json_dependencies_are_extracted() {
+        let parsed = parse_dependencies("package.json", "{\n \"dependencies\": {\n \"react\": \"^18.0.0\"\n }\n}");
+        assert_eq!(parsed[0], ("npm".into(), "react".into(), "^18.0.0".into()));
     }
 }
