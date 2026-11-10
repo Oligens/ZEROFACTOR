@@ -37,7 +37,7 @@ import re
 import sys
 
 for family_text in sys.argv[1:]:
-    candidates = re.findall(r'(?<![0-9A-Fa-f:.])(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?:/[0-9]{1,2})?|(?<![0-9A-Fa-f:.])[0-9A-Fa-f:]{2,}(?:/[0-9]{1,3})?', family_text)
+    candidates = re.findall(r'(?<![0-9A-Fa-f:.])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?:/[0-9]{1,2})?|(?<![0-9A-Fa-f:.])[0-9A-Fa-f:]{2,}(?:/[0-9]{1,3})?', family_text)
     for candidate in candidates:
         try:
             network = ipaddress.ip_network(candidate, strict=False)
