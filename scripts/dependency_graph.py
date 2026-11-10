@@ -74,7 +74,7 @@ def cargo(data):
     for p in packages:
         deps=[];unresolved=[]
         for raw in p.get("dependencies",[]):
-            m=re.match(r"^(.+?) ([^ ]+)(?: \\((.+)\\))?$",raw)
+            m=re.match(r"^(.+?) ([^ ]+)(?: \((.+)\))?$",raw)
             if m:
                 name,version,source=m.group(1),m.group(2),m.group(3)
                 hits=[x for x in index.get(name.lower(),[]) if x.get("version")==version and (source is None or x.get("source")==source)]
