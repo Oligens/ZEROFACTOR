@@ -268,6 +268,7 @@ def package_key(value):
     """Split pnpm/Yarn package locator into normalized name and exact version."""
     value=str(value).strip().strip("'\"")
     value=value.lstrip("/")
+    if "@npm:" in value:value=value.replace("@npm:","@",1)
     value=re.sub(r"\([^)]*\)$","",value)
     if value.startswith("@"):
         parts=value.split("/")
@@ -384,7 +385,7 @@ def maven_tree(path):
     for line in path.read_text(errors="replace").splitlines():
         value=re.sub(r"^\s*\[INFO\]\s?","",line).rstrip()
         if not value or value.startswith(("---","BUILD ","[WARNING]","[ERROR]")):continue
-        match=re.match(r"^(?P<prefix>(?:(?:\\|  |   ))*)(?:\\+- |\\\\- )(?P<coord>.+)$",value)
+        match=re.match(r"^(?P<prefix>(?:\|  |   )*)(?:\+- |\\- )(?P<coord>.+)$",value)
         if match:
             depth=len(match.group("prefix"))//3+1;raw=match.group("coord").strip()
         else:
@@ -400,7 +401,7 @@ def maven_tree(path):
         item=row("Maven",name,version,"maven-dependency-tree.txt",[],[],group=group,artifact=artifact,packaging=packaging,scope=scope)
         out.append(item)
         if depth>0:
-            while len(stack)>=depth:stack.pop()
+            while len(stack)>depth:stack.pop()
             if stack:stack[-1]["dependencies"].append(name+"@"+version)
             stack.append(item)
         else:stack=[item]
@@ -411,7 +412,7 @@ def maven_tree(path):
 def gradle_report(path):
     """Parse a pre-generated Gradle dependencies report; unresolved/dynamic selectors remain incomplete."""
     out=[];stack=[]
-    branch=re.compile(r"^(?P<prefix>(?:\\|    |     )*)(?:\\+--- |\\\\--- )(?P<coord>.+)$")
+    branch=re.compile(r"^(?P<prefix>(?:\|    |     )*)(?:\+--- |\\--- )(?P<coord>.+)$")
     coord_re=re.compile(r"^([^: ]+):([^: ]+):([^ ]+)(?: -> ([^ ]+))?(?:\\s+\\(.*\\))?$")
     for line in path.read_text(errors="replace").splitlines():
         value=line.rstrip()
@@ -463,7 +464,7 @@ def main():
         if p.is_file() and p.name in names:files.append(p)
     for p in sorted(files):
         try:
-            for item in extract(p):
+            if p.name=="gradle.lockfile" and any(x.name=="gradle-dependencies.txt" for x in files):\n                continue\n            for item in extract(p):
                 item["lockfile"]=str(p.relative_to(root));key=(item["ecosystem"],item["name"],item["version"],item["lockfile"],item["source"])
                 if key not in seen:found.append(item);seen.add(key)
         except Exception as e:errors.append({"lockfile":str(p.relative_to(root)),"error":str(e)})
