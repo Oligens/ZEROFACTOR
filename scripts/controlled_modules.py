@@ -234,8 +234,7 @@ def evaluate(module, scope_path, fixture_path, output_path, now=None):
         overall = "inconclusive"
     else:
         overall = "pass"
-    origin = validated["target_origin"]
-    target_fingerprint = hashlib.sha256(origin.encode("utf-8")).hexdigest()
+    target_fingerprint = hashlib.sha256(validated["target_origin"].encode("utf-8")).hexdigest()
     observed_at = dt.datetime.now(dt.timezone.utc).isoformat()
     evidence = []
     for check in checks:
@@ -247,6 +246,7 @@ def evaluate(module, scope_path, fixture_path, output_path, now=None):
             "result": check["result"],
             "reason": check["reason"],
             "authorization_id": validated["authorization_id"],
+            "authorization_expires_at": validated["expires_at"],
             "target_fingerprint": target_fingerprint,
             "observed_at": observed_at,
         })
@@ -257,6 +257,9 @@ def evaluate(module, scope_path, fixture_path, output_path, now=None):
         "result": overall,
         "evidence_kind": "synthetic_fixture",
         "observed_at": observed_at,
+        "authorization_id": validated["authorization_id"],
+        "authorization_expires_at": validated["expires_at"],
+        "target_fingerprint": target_fingerprint,
         "checks": checks,
         "evidence_records": evidence,
         "safety": {
