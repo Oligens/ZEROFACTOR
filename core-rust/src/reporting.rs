@@ -8,7 +8,8 @@ pub fn render_summary(target: &str, result: &ZfiResult, findings: &[Finding]) ->
     report.push_str(&format!("Target: {target}\n"));
     report.push_str(&format!("ZFI: {:.3}\n", result.score));
     report.push_str(&format!("Assessed guarantees: {}\n", result.assessed_count));
-    report.push_str(&format!("Not tested: {}\n\n", result.not_tested_count));
+    report.push_str(&format!("Not tested: {}\n", result.not_tested_count));
+    report.push_str(&format!("Coverage: {:.1}%\n\n", result.coverage_ratio * 100.0));
     report.push_str("## Findings\n");
     for finding in findings {
         report.push_str(&format!("- [{}] {} — {} ({:?})\n",
