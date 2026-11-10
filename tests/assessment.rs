@@ -14,6 +14,7 @@ fn scans_local_tree_and_redacts_possible_secret() {
     fs::write(root.join("requirements.txt"), "requests==2.0\n").unwrap();
     let a = scan_repository(&root, &ScanOptions::default()).unwrap();
     assert!(a.files_examined >= 2);
+    assert!(a.dependencies.iter().any(|d| d.name == "requests" && d.ecosystem == "python"));
     let serialized = zerofactor::report::json(&a);
     assert!(!serialized.contains("do-not-leak-this-value"));
     assert!(serialized.contains("REDACTED"));
