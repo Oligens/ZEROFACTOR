@@ -13,6 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.x"
@@ -38,10 +41,10 @@ jobs:
           echo "$status" > osv-scanner.exit-code
           if [ "$status" -gt 1 ]; then exit "$status"; fi
       - name: Normalize exact-version advisory matches
-        if: always() && hashFiles('osv-results.json') != ''
         run: python3 scripts/normalize_osv.py osv-results.json --output advisory-results.json
-      - name: Enforce CVE policy when trusted source metadata is supplied
-        if: always() && hashFiles('source-metadata.json') != ''
+      - name: Fetch trusted OSV database freshness metadata
+        run: python3 scripts/fetch_osv_metadata.py --output source-metadata.json
+      - name: Enforce mandatory CVE policy
         run: python3 scripts/cve_policy.py advisory-results.json --source-metadata source-metadata.json --output cve-policy-result.json
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@v0
@@ -55,7 +58,17 @@ jobs:
           path: .
           format: cyclonedx-json
           output-file: sbom.cdx.json
-      - name: Upload dependency, advisory and SBOM evidence
+      - name: Validate required assessment artifacts and block incomplete results
+        run: |
+          python3 scripts/assessment_gate.py \
+            --graph dependency-graph.json \
+            --advisories advisory-results.json \
+            --policy-result cve-policy-result.json \
+            --osv-exit-code "$(cat osv-scanner.exit-code)" \
+            --spdx sbom.spdx.json \
+            --cyclonedx sbom.cdx.json \
+            --output assessment-gate.json
+      - name: Upload dependency, advisory, policy, SBOM and gate evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -65,14 +78,19 @@ jobs:
             osv-results.json
             osv-scanner.exit-code
             advisory-results.json
+            source-metadata.json
             cve-policy-result.json
             sbom.spdx.json
             sbom.cdx.json
+            assessment-gate.json
           if-no-files-found: warn
   sandbox-preflight:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh
       - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - run: test -s dashboard/index.html && test -s dashboard/app.js
