@@ -415,7 +415,7 @@ def gradle_report(path):
     """Parse a pre-generated Gradle dependencies report; unresolved/dynamic selectors remain incomplete."""
     out=[];stack=[]
     branch=re.compile(r"^(?P<prefix>(?:\|    |     )*)(?:\+--- |\\--- )(?P<coord>.+)$")
-    coord_re=re.compile(r"^([^: ]+):([^: ]+):([^ ]+)(?: -> ([^ ]+))?(?:\\s+\\(.*\\))?$")
+    coord_re=re.compile(r"^([^: ]+):([^: ]+):([^ ]+)(?: -> ([^ ]+))?(?:\s+\(.*\))?$")
     for line in path.read_text(errors="replace").splitlines():
         value=line.rstrip()
         match=branch.match(value)
@@ -451,7 +451,7 @@ def extract(path):
     if n=="pnpm-lock.yaml":return pnpm_lock(path)
     if n=="maven-dependency-tree.txt":return maven_tree(path)
     if n=="gradle-dependencies.txt":return gradle_report(path)
-    if n=="yarn.lock":return yarn_berry(path) if "__metadata:" in path.read_text(errors="replace") else yarn_classic(path)
+    if n=="yarn.lock":return yarn_berry(path) if re.search(r'["\']?__metadata["\']?\s*:',path.read_text(errors="replace")) else yarn_classic(path)
     if n in ("poetry.lock","uv.lock"):return python_toml(tomllib.loads(path.read_text()),n)
     if n=="Pipfile.lock":return pipfile(json.loads(path.read_text()))
     if n=="go.sum":return go_sum(path)
