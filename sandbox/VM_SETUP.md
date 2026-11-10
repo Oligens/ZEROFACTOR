@@ -62,7 +62,7 @@ Official references:
 
 ## 4. Preload a reviewed test image
 
-Build or obtain a minimal, reviewed test image from a trusted build pipeline. Pin the image by immutable digest in the lab inventory, record its image ID, and transfer it to the VM through the approved artifact channel. Do not pull images during a test job.
+Build or obtain a minimal, reviewed test image from a trusted build pipeline. The image must include `/bin/sh`, `cat`, `touch` and `awk` for the current confinement probes. Pin the image by immutable digest in the lab inventory, record its image ID, and transfer it to the VM through the approved artifact channel. Do not pull images during a test job.
 
 ```bash
 docker load --input zerofactor-test-image.tar
