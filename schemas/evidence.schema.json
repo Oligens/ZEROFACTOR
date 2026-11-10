@@ -4,7 +4,7 @@
  "title":"ZEROFACTOR Evidence and Impact Record","type":"object",
  "required":["evidence_id","assessment_id","test_id","classification","scope","observed_at","result","integrity"],
  "properties":{
-  "evidence_id":{"type":"string","minLength":8},"assessment_id":{"type":"string","minLength":1},"test_id":{"type":"string","minLength":1},
+  "evidence_id":{"type":"string","minLength":8},"assessment_id":{"type":"string","minLength":1},"test_id":{"type":"string","minLength":1},"finding_id":{"type":"string"},
   "classification":{"enum":["static","simulated","reproduced","independently_verified"]},
   "scope":{"type":"object","required":["authorization_id","target_fingerprint","expires_at"],"properties":{"authorization_id":{"type":"string"},"target_fingerprint":{"type":"string"},"expires_at":{"type":"string","format":"date-time"}},"additionalProperties":false},
   "observed_at":{"type":"string","format":"date-time"},"result":{"enum":["pass","fail","inconclusive","not_run"]},
