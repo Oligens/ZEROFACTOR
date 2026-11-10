@@ -21,9 +21,9 @@ def validate_evidence(item):
  artifact=(item.get("integrity") or {}).get("artifact_uri")
  if artifact:
   p=pathlib.Path(artifact)
-  if p.is_file():
-   actual=hashlib.sha256(p.read_bytes()).hexdigest()
-   if actual.lower()!=digest.lower():raise ValueError("evidence artifact SHA-256 mismatch: "+str(p))
+  if not p.is_file():raise ValueError("evidence artifact path does not exist locally: "+str(p))
+  actual=hashlib.sha256(p.read_bytes()).hexdigest()
+  if actual.lower()!=digest.lower():raise ValueError("evidence artifact SHA-256 mismatch: "+str(p))
  return True
 def main():
  ap=argparse.ArgumentParser();ap.add_argument("--report",required=True);ap.add_argument("--dependencies");ap.add_argument("--advisories");ap.add_argument("--evidence");ap.add_argument("--output",default="assessment-platform.json");a=ap.parse_args()
