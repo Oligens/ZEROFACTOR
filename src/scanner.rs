@@ -78,14 +78,18 @@ pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessm
         Check { id: "manifests".into(), description: "Common dependency manifests and direct declarations parsed".into(), weight: 1.5, tested: true, failure_factor: 0.0 },
         Check { id: "sensitive-config".into(), description: "Sensitive configuration and possible secret patterns".into(), weight: 2.0, tested: true, failure_factor: 0.0 },
         Check { id: "validation-heuristics".into(), description: "Selected source-level validation and unsafe API heuristics".into(), weight: 2.0, tested: true, failure_factor: 0.0 },
-        Check { id: "dependency-audit".into(), description: "Dependency version and advisory audit".into(), weight: 3.0, tested: false, failure_factor: 0.0 },
+        Check { id: "dependency-transitives".into(), description: "Complete lockfile parsing and transitive dependency resolution".into(), weight: 3.0, tested: false, failure_factor: 0.0 },
+        Check { id: "cve-advisories".into(), description: "CVE and security-advisory matching against resolved package versions".into(), weight: 3.0, tested: false, failure_factor: 0.0 },
         Check { id: "runtime-tests".into(), description: "Runtime and integration behavior verification".into(), weight: 3.0, tested: false, failure_factor: 0.0 },
         Check { id: "sandbox".into(), description: "Isolated adversarial execution and dynamic testing".into(), weight: 4.0, tested: false, failure_factor: 0.0 },
     ];
     if !dependency_files_seen { a.warnings.push("No supported dependency manifest was discovered; dependency inventory is incomplete.".into()); }
     if !sensitive_config_seen { a.warnings.push("No selected sensitive-configuration pattern was observed; this is not proof that secrets are absent.".into()); }
     if !validation_patterns_seen { a.warnings.push("No selected validation anti-pattern was observed; this is not proof that source validation is safe.".into()); }
-    a.warnings.push("Dependency inventory is static and partial; no package advisory database or transitive dependency resolution is used.".into());
+    a.warnings.push("Dependency inventory is limited to directly declared packages found in supported manifests; lockfile-complete and transitive resolution are not implemented.".into());
+    a.warnings.push("CVE and security-advisory assessment is not implemented; no advisory database is queried and no statement about the presence or absence of CVEs can be made.".into());
+    a.warnings.push("No real isolated sandbox or controlled target-code execution is implemented; the scanner remains read-only and never executes target code.".into());
+    a.warnings.push("No dashboard is implemented; results are currently available as command-line Markdown or JSON reports.".into());
     Ok(a)
 }
 
