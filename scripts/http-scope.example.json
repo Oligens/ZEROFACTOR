@@ -1,0 +1,8 @@
+{
+  "authorization_id": "REPLACE-WITH-WRITTEN-AUTHORIZATION-ID",
+  "assessment_id": "controlled-http-assessment-001",
+  "target_url": "https://app.example.test/",
+  "allowed_hosts": ["app.example.test"],
+  "expires_at": "2027-01-01T00:00:00Z",
+  "finding_ids": {}
+}
