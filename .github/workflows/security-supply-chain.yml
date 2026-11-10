@@ -1,0 +1,53 @@
+name: Security and SBOM
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: RustSec advisory audit
+        run: cargo audit --deny warnings
+      - name: OSV Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v2.2.2
+        with:
+          scan-args: |-
+            --recursive
+            .
+        continue-on-error: true
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+      - name: Upload SBOM artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerofactor-sbom
+          path: |
+            sbom.spdx.json
+            sbom.cdx.json
+          if-no-files-found: warn
+  sandbox-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n sandbox/run-isolated.sh
+      - run: test -s dashboard/index.html && test -s dashboard/app.js
