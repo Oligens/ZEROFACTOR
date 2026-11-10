@@ -11,6 +11,10 @@ class PolicyTests(unittest.TestCase):
   now=dt.datetime(2026,11,9,tzinfo=dt.timezone.utc)
   result=evaluate({"sources":[{"name":"OSV","last_updated":"2026-10-01T00:00:00Z"}],"matches":[]},{"max_database_age_days":7,"allowed_sources":["OSV"]},now)
   self.assertFalse(result["passed"]);self.assertTrue(result["source_errors"])
+ def test_future_database_timestamp_fails_closed(self):
+  now=dt.datetime(2026,11,9,tzinfo=dt.timezone.utc)
+  result=evaluate({"sources":[{"name":"OSV","last_updated":"2026-11-10T00:00:00Z"}],"matches":[]},{"max_database_age_days":7,"allowed_sources":["OSV"]},now)
+  self.assertFalse(result["passed"]);self.assertTrue(result["source_errors"])
  def test_unversioned_match_is_review_not_block(self):
   result=evaluate({"sources":[],"matches":[{"package":"demo","severity_label":"critical"}]},{"allowed_sources":[]})
   self.assertFalse(result["passed"]);self.assertEqual(len(result["decisions"]["review"]),1)
