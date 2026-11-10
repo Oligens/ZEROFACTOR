@@ -47,7 +47,7 @@ def run(scope_path, output, selected):
     body_digest=hashlib.sha256(body).hexdigest()
     artifact_payload={"http_status":status,"body_bytes_observed":len(body),"body_sha256":body_digest,
                       "response_header_names":sorted(headers.keys()),"set_cookie_count":len(cookie_values)}
-    artifact_bytes=(json.dumps(artifact_payload,sort_keys=True,separators=(",",":"))+"\\n").encode()
+    artifact_bytes=json.dumps(artifact_payload,sort_keys=True,separators=(",",":")).encode()
     artifact_dir=pathlib.Path(output).with_suffix("").parent/"evidence-artifacts"; artifact_dir.mkdir(parents=True,exist_ok=True)
     artifact=artifact_dir/(uuid.uuid4().hex+".json"); artifact.write_bytes(artifact_bytes)
     digest=hashlib.sha256(artifact_bytes).hexdigest()
