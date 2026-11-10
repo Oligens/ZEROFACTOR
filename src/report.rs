@@ -10,7 +10,7 @@ pub fn markdown(a: &Assessment) -> String {
     let _ = writeln!(out, "- **Bytes examined:** {}", a.bytes_examined);
     let _ = writeln!(out, "- **Components discovered:** {}", a.components.len());
     let _ = writeln!(out, "- **Direct dependencies discovered:** {}", a.dependencies.len());
-    let _ = writeln!(out, "- **Findings:** {}\n", a.findings.len());
+    let _ = writeln!(out, "- **Source findings:** {}\n", a.findings.len());
     match a.zfi() {
         Some(v) => { let _ = writeln!(out, "- **Source-evidence ZFI:** {:.1}/100", v); }
         None => { let _ = writeln!(out, "- **Source-evidence ZFI:** not available (no confirmed source-level failure recorded)"); }
@@ -23,10 +23,33 @@ pub fn markdown(a: &Assessment) -> String {
     let _ = writeln!(out, "\n## Direct dependencies\n| Ecosystem | Package | Declared version | Manifest |\n|---|---|---|---|");
     if a.dependencies.is_empty() { let _ = writeln!(out, "| — | No supported declaration parsed | — | — |"); }
     for d in &a.dependencies { write_dependency(&mut out, d); }
-    let _ = writeln!(out, "\n## Findings\n");
+    let _ = writeln!(out, "\n## Source findings\n");
     if a.findings.is_empty() { let _ = writeln!(out, "No selected heuristic matched. This is not proof of absence of vulnerabilities.\n"); }
     for f in &a.findings { write_finding(&mut out, f); }
-    let _ = writeln!(out, "## Coverage by check\n| Check | Tested | Weight | Failure factor |\n|---|---:|---:|---:|");
+
+    if !a.evidence.module_summaries.is_empty() {
+        let _ = writeln!(out, "## Controlled module evidence\n");
+        let _ = writeln!(out, "| Module | Result | Cases | Pass | Fail | Inconclusive | Classification |");
+        let _ = writeln!(out, "|---|---:|---:|---:|---:|---:|---|");
+        for s in &a.evidence.module_summaries {
+            let _ = writeln!(out, "| {} | {} | {} | {} | {} | {} | {} |",
+                s.module, s.result, s.cases, s.passed, s.failed, s.inconclusive, s.evidence_kind);
+        }
+        let _ = writeln!(out, "\n> These imported module records are synthetic fixture evidence. They are not live-target observations or confirmed vulnerabilities.\n");
+    }
+    if !a.evidence.controlled_findings.is_empty() {
+        let _ = writeln!(out, "## Controlled review candidates\n");
+        for f in &a.evidence.controlled_findings {
+            let _ = writeln!(out, "### {} — {}\n", f.finding_id, f.title);
+            let _ = writeln!(out, "- **Module/case:** {}/{}", f.module, f.case_id);
+            let _ = writeln!(out, "- **Status:** {}", f.status);
+            let _ = writeln!(out, "- **Classification:** simulated fixture");
+            let _ = writeln!(out, "- **Evidence ID:** {}", f.evidence_id);
+            let _ = writeln!(out, "- **Reason:** {}", f.reason);
+            let _ = writeln!(out, "- **Recommendation:** {}\n", f.recommendation);
+        }
+    }
+    let _ = writeln!(out, "## Coverage by source check\n| Check | Tested | Weight | Failure factor |\n|---|---:|---:|---:|");
     for c in &a.checks { let _ = writeln!(out, "| {} | {} | {:.1} | {:.2} |", c.id, c.tested, c.weight, c.failure_factor); }
     if !a.warnings.is_empty() {
         let _ = writeln!(out, "\n## Limitations and warnings\n");
@@ -34,9 +57,11 @@ pub fn markdown(a: &Assessment) -> String {
     }
     out
 }
+
 fn write_dependency(out: &mut String, d: &Dependency) {
     let _ = writeln!(out, "| {} | {} | {} | {} |", d.ecosystem, d.name, d.version_spec, d.manifest.display());
 }
+
 fn write_finding(out: &mut String, f: &Finding) {
     let _ = writeln!(out, "### [{}] {} — {}\n", f.severity.as_str().to_uppercase(), f.title, f.status.as_str());
     let _ = writeln!(out, "- **ID:** {}", f.id);
@@ -45,9 +70,12 @@ fn write_finding(out: &mut String, f: &Finding) {
     let _ = writeln!(out, "- **Evidence:** `{}`", f.evidence.replace('`', "'"));
     let _ = writeln!(out, "- **Recommendation:** {}\n", f.recommendation);
 }
+
 pub fn json(a: &Assessment) -> String {
-    let evidence_records=serde_json::to_string(&a.evidence.records).unwrap_or_else(|_|"[]".into());
-    let impact_summary=serde_json::to_string(&a.evidence.impact_summary()).unwrap_or_else(|_|"{}".into());
+    let evidence_records = serde_json::to_string(&a.evidence.records).unwrap_or_else(|_| "[]".into());
+    let impact_summary = serde_json::to_string(&a.evidence.impact_summary()).unwrap_or_else(|_| "{}".into());
+    let controlled_findings = serde_json::to_string(&a.evidence.controlled_findings).unwrap_or_else(|_| "[]".into());
+    let module_summaries = serde_json::to_string(&a.evidence.module_summaries).unwrap_or_else(|_| "[]".into());
     let findings = a.findings.iter().map(|f| format!(
         "{{\"id\":{},\"category\":{},\"severity\":{},\"status\":{},\"title\":{},\"path\":{},\"line\":{},\"evidence\":{},\"recommendation\":{}}}",
         q(&f.id), q(&f.category), q(f.severity.as_str()), q(f.status.as_str()), q(&f.title), q(&f.path.display().to_string()),
@@ -62,26 +90,58 @@ pub fn json(a: &Assessment) -> String {
         "{{\"id\":{},\"description\":{},\"weight\":{},\"tested\":{},\"failure_factor\":{}}}",
         q(&c.id), q(&c.description), c.weight, c.tested, c.failure_factor
     )).collect::<Vec<_>>().join(",");
-    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{}}}",
+    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{},\"controlled_findings\":{},\"controlled_module_summaries\":{}}}",
         q(&a.root.display().to_string()), a.files_examined, a.files_skipped, a.bytes_examined,
         a.zfi().map(|v| v.to_string()).unwrap_or_else(|| "null".into()), a.coverage(), components, dependencies, findings, checks,
-        a.warnings.iter().map(|w| q(w)).collect::<Vec<_>>().join(","), evidence_records, impact_summary)
+        a.warnings.iter().map(|w| q(w)).collect::<Vec<_>>().join(","), evidence_records, impact_summary, controlled_findings, module_summaries)
 }
+
 fn q(s: &str) -> String {
     let mut out = String::from("\"");
-    for c in s.chars() { match c { '"' => out.push_str("\\\""), '\\' => out.push_str("\\\\"), '\n' => out.push_str("\\n"), '\r' => out.push_str("\\r"), '\t' => out.push_str("\\t"), c if c.is_control() => out.push(' '), c => out.push(c) } }
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""), '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"), '\r' => out.push_str("\\r"), '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push(' '), c => out.push(c)
+        }
+    }
     out.push('"'); out
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{Assessment, Check};
     use std::path::PathBuf;
-    #[test] fn json_is_valid_shape_and_escapes_quotes() {
-        let a = Assessment { root: PathBuf::from("/tmp/a"), files_examined: 1, files_skipped: 0, bytes_examined: 2,
-            findings: vec![], components: vec![], dependencies: vec![], evidence: crate::evidence::EvidenceIndex::default(), checks: vec![Check { id: "x".into(), description: "a \"quote\"".into(), weight: 1.0, tested: true, failure_factor: 0.0 }], warnings: vec![] };
-        let j = json(&a);
+
+    fn assessment() -> Assessment {
+        Assessment {
+            root: PathBuf::from("/tmp/a"), files_examined: 1, files_skipped: 0, bytes_examined: 2,
+            findings: vec![], components: vec![], dependencies: vec![], evidence: crate::evidence::EvidenceIndex::default(),
+            checks: vec![Check { id: "x".into(), description: "a \"quote\"".into(), weight: 1.0, tested: true, failure_factor: 0.0 }],
+            warnings: vec![],
+        }
+    }
+
+    #[test]
+    fn json_is_valid_shape_and_escapes_quotes() {
+        let j = json(&assessment());
         assert!(j.contains("\\\"quote\\\""));
-        assert!(j.starts_with("{"));
+        let parsed: serde_json::Value = serde_json::from_str(&j).unwrap();
+        assert!(parsed.get("controlled_findings").is_some());
+    }
+
+    #[test]
+    fn markdown_separates_simulated_findings() {
+        let mut a = assessment();
+        a.evidence.controlled_findings.push(crate::evidence::ControlledFinding {
+            finding_id: "ZF-AUTH-123456789abc".into(), module: "AUTH".into(), case_id: "fixture".into(),
+            title: "AUTH policy mismatch".into(), reason: "unexpected_status".into(), status: "needs_review".into(),
+            classification: crate::evidence::EvidenceClass::Simulated, evidence_id: "evidence-123".into(),
+            recommendation: "Review in an approved lab.".into(),
+        });
+        let md = markdown(&a);
+        assert!(md.contains("Controlled review candidates"));
+        assert!(md.contains("simulated fixture"));
     }
 }
