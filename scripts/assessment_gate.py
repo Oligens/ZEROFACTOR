@@ -103,6 +103,9 @@ def validate(args):
     advisories = load_json(args.advisories)
     policy = load_json(args.policy_result)
     packages = graph.get("packages") or []
+    invalid_inventory = [p for p in packages if not p.get("ecosystem") or not p.get("name") or not p.get("version")]
+    if invalid_inventory:
+        failures.append(f"Dependency inventory contains {len(invalid_inventory)} package record(s) without ecosystem/name/exact version")
     if not graph.get("lockfiles_found"):
         failures.append("No lockfiles were discovered; dependency coverage cannot be asserted")
     if not graph.get("graph_complete"):
@@ -172,6 +175,7 @@ def validate(args):
         "required_checks": {
             "dependency_graph": "passed" if graph.get("graph_complete") and not graph.get("errors") else "failed",
             "dependency_edges_resolve": "passed" if not edge_errors else "failed",
+            "inventory_identity_completeness": "passed" if not invalid_inventory else "failed",
             "cve_policy": "passed" if policy.get("passed") is True and not policy.get("source_errors") else "failed",
             "osv_scan": "passed" if int(args.osv_exit_code) in (0, 1) else "failed",
             "rustsec_scan": "passed" if rustsec_exit_code in (0, 1) else "failed",
