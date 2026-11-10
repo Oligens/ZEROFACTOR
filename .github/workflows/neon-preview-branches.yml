@@ -1,0 +1,101 @@
+name: Neon Preview Database Branches
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: neon-preview-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  create-and-validate:
+    name: Create isolated Neon branch and validate schema
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed PR source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set 14-day branch expiration
+        id: expiry
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "expires_at=$(date -u --date='+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Create or reuse PR Neon branch
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: preview-pr-${{ github.event.pull_request.number }}
+          parent_branch: main
+          database: zerofactor
+          role: zerofactor_owner
+          expires_at: ${{ steps.expiry.outputs.expires_at }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Mask generated database connection string
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATABASE_URL}" ]]; then
+            echo "::error::Neon did not return a pooled connection string."
+            exit 1
+          fi
+          echo "::add-mask::${DATABASE_URL}"
+
+      - name: Apply idempotent ZEROFACTOR schema migration
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+          PGCONNECT_TIMEOUT: "10"
+        run: |
+          set -euo pipefail
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f migrations/001_vercel_backend.sql
+
+      - name: Verify required tables and database connectivity
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+          PGCONNECT_TIMEOUT: "10"
+        run: |
+          set -euo pipefail
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atc "
+            SELECT CASE
+              WHEN COUNT(*) = 5 THEN 'schema_ok'
+              ELSE 'schema_incomplete'
+            END
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name IN ('users','sessions','projects','memberships','assessments');
+          " | grep -qx 'schema_ok'
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' | grep -qx '1'
+
+  delete-preview-branch:
+    name: Delete closed PR Neon branch
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete only this PR Neon branch
+        uses: neondatabase/delete-branch-action@v3
+        continue-on-error: true
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: preview-pr-${{ github.event.pull_request.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
