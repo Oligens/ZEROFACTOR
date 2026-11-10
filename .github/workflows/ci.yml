@@ -19,6 +19,6 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Test lockfile graph extractors
-        run: python3 -m unittest scripts/test_dependency_graph.py
+        run: python3 -m unittest scripts/test_dependency_graph.py scripts/test_platform_assembly.py
       - name: Validate shell scripts
         run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh
