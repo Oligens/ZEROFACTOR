@@ -1,0 +1,16 @@
+{
+  "module": "RECOVERY",
+  "case_id": "recovery-operator-snapshot",
+  "pre_snapshot_id": "synthetic-snapshot-before",
+  "post_snapshot_id": "synthetic-snapshot-after",
+  "operator_action_id": "synthetic-operator-action",
+  "elapsed_seconds": 18,
+  "rto_seconds": 60,
+  "post_health_checks": [
+    {"healthy": true},
+    {"healthy": true}
+  ],
+  "dependency_checks": [
+    {"healthy": true}
+  ]
+}
