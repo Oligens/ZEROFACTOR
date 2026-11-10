@@ -65,6 +65,10 @@ python3 -m unittest discover -s server -p 'test_*.py'
 
 Open `http://127.0.0.1:8765/`. Accounts, project memberships, assessment history and roles are stored in SQLite. Roles are Owner, Analyst and Viewer. The API binds to loopback only and is not production-ready for public exposure.
 
+## Vercel dashboard backend
+
+The hosted dashboard uses a Node.js Vercel Function and a dedicated Neon PostgreSQL database. The local SQLite WSGI backend remains for local-only development. See [Vercel deployment and persistent backend](docs/VERCEL_DEPLOYMENT.md). Do not expose the local SQLite server publicly.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)

@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "framework": null,
+  "outputDirectory": "dashboard",
+  "functions": {
+    "api/[...path].js": {
+      "maxDuration": 15
+    }
+  },
+  "rewrites": [
+    { "source": "/favicon.ico", "destination": "/favicon.svg" },
+    { "source": "/dashboard", "destination": "/index.html" },
+    { "source": "/dashboard/:path*", "destination": "/:path*" }
+  ]
+}

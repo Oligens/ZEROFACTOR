@@ -10,7 +10,7 @@ from wsgiref.simple_server import make_server
 DB=os.environ.get("ZEROFACTOR_DB","zerofactor.sqlite3")
 SESSION_SECONDS=8*60*60
 STATIC_ROOT=Path(__file__).resolve().parent.parent/"dashboard"
-STATIC_FILES={"/":("index.html","text/html; charset=utf-8"),"/dashboard":("index.html","text/html; charset=utf-8"),"/dashboard/":("index.html","text/html; charset=utf-8"),"/dashboard/app.js":("app.js","text/javascript; charset=utf-8"),"/dashboard/style.css":("style.css","text/css; charset=utf-8")}
+STATIC_FILES={"/":("index.html","text/html; charset=utf-8"),"/dashboard":("index.html","text/html; charset=utf-8"),"/dashboard/":("index.html","text/html; charset=utf-8"),"/app.js":("app.js","text/javascript; charset=utf-8"),"/style.css":("style.css","text/css; charset=utf-8"),"/favicon.svg":("favicon.svg","image/svg+xml"),"/dashboard/app.js":("app.js","text/javascript; charset=utf-8"),"/dashboard/style.css":("style.css","text/css; charset=utf-8")}
 ROLES={"owner":3,"analyst":2,"viewer":1}
 
 def connect():

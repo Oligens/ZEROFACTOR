@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>ZEROFACTOR | Security Intelligence</title><link rel="stylesheet" href="/dashboard/style.css"></head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="theme-color" content="#0a192f"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><title>ZEROFACTOR | Security Intelligence</title><link rel="stylesheet" href="/style.css"></head>
 <body>
 <header><div><p class="eyebrow">INDEPENDENT SECURITY VALIDATION</p><h1>ZEROFACTOR</h1><p class="muted">Plateforme de validation et de preuves de sécurité</p></div><div id="uploadWrap" hidden class="upload">Importer un rapport JSON <input id="reportFile" type="file" accept="application/json,.json"></div></header>
 <main>
 <section id="notice" class="notice">Connectez-vous pour accéder à vos projets et évaluations.</section>
 <section id="authPanel" class="panel auth-panel">
- <h2>Accès à ZEROFACTOR</h2><p class="muted small">Les comptes et projets sont gérés par le serveur local.</p>
+ <h2>Accès à ZEROFACTOR</h2><p class="muted small">Les comptes et projets sont gérés par le serveur sécurisé.</p>
  <div class="auth-grid">
   <form id="loginForm"><h3>Connexion</h3><label>E-mail<input id="loginEmail" type="email" autocomplete="username" required></label><label>Mot de passe<input id="loginPassword" type="password" autocomplete="current-password" required></label><button type="submit">Se connecter</button></form>
   <form id="registerForm"><h3>Créer un compte</h3><label>E-mail<input id="registerEmail" type="email" autocomplete="email" required></label><label>Mot de passe (12 caractères minimum)<input id="registerPassword" type="password" minlength="12" autocomplete="new-password" required></label><button type="submit" class="secondary">Créer le compte</button></form>
@@ -24,6 +24,6 @@
  <section class="panel"><h2>Avis de vulnérabilité</h2><div class="table-wrap"><table><thead><tr><th>Paquet</th><th>Version résolue</th><th>Avis</th><th>Fichier source</th></tr></thead><tbody id="advisoryRows"><tr><td colspan="4">Aucun avis</td></tr></tbody></table></div></section>
  <section class="grid"><article class="panel"><h2>Preuves</h2><div id="evidenceRows">Aucune preuve.</div></article><article class="panel"><h2>Impact mesuré</h2><div id="impactRows">Aucune mesure.</div></article></section>
  <section class="panel"><h2>Avertissements et limites</h2><ul id="warnings"><li>Importez un rapport.</li></ul></section>
- <p class="warning">Les autorisations et rôles sont appliqués par le serveur local. Ce backend reste destiné au développement sur localhost ; ne l'exposez pas sur Internet.</p>
+ <p class="warning">Les autorisations et rôles sont appliqués par le serveur. Les résultats synthétiques ne constituent pas une preuve de vulnérabilité reproduite.</p>
 </div>
-</main><footer>ZEROFACTOR · Validation indépendante · Un scan statique propre n'est pas une preuve de sécurité.</footer><script src="/dashboard/app.js"></script></body></html>
+</main><footer>ZEROFACTOR · Validation indépendante · Un scan statique propre n'est pas une preuve de sécurité.</footer><script src="/app.js"></script></body></html>
