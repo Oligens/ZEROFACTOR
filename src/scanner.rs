@@ -1,4 +1,4 @@
-use crate::model::{Assessment, Check, Finding, FindingStatus, Severity};
+use crate::model::{Assessment, Check, Dependency, Finding, FindingStatus, Severity};
 use std::collections::BTreeSet;
 use std::fs;
 use std::io;
@@ -8,10 +8,7 @@ const MAX_FILE_BYTES: u64 = 1_048_576;
 const MAX_FILES: usize = 20_000;
 
 #[derive(Debug, Clone)]
-pub struct ScanOptions {
-    pub max_files: usize,
-    pub max_file_bytes: u64,
-}
+pub struct ScanOptions { pub max_files: usize, pub max_file_bytes: u64 }
 impl Default for ScanOptions {
     fn default() -> Self { Self { max_files: MAX_FILES, max_file_bytes: MAX_FILE_BYTES } }
 }
@@ -19,100 +16,140 @@ impl Default for ScanOptions {
 pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessment> {
     let root = fs::canonicalize(root)?;
     if !root.is_dir() { return Err(io::Error::new(io::ErrorKind::InvalidInput, "scan target must be a directory")); }
-
-    let mut assessment = Assessment {
-        root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0,
-        findings: Vec::new(), checks: Vec::new(), warnings: Vec::new(),
-    };
+    let mut a = Assessment { root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0,
+        findings: Vec::new(), dependencies: Vec::new(), checks: Vec::new(), warnings: Vec::new() };
     let mut files = Vec::new();
-    collect_files(&root, &root, options, &mut files, &mut assessment)?;
+    collect_files(&root, &root, options, &mut files, &mut a)?;
     files.sort();
-
-    let mut manifests = BTreeSet::new();
+    let mut seen_deps = BTreeSet::new();
     let mut sensitive_config_seen = false;
     let mut validation_patterns_seen = false;
     let mut dependency_files_seen = false;
 
     for path in files {
-        let metadata = match fs::symlink_metadata(&path) { Ok(m) => m, Err(_) => { assessment.files_skipped += 1; continue; } };
-        if metadata.file_type().is_symlink() || !metadata.is_file() { assessment.files_skipped += 1; continue; }
-        if metadata.len() > options.max_file_bytes { assessment.files_skipped += 1; continue; }
-        let bytes = match fs::read(&path) { Ok(b) => b, Err(_) => { assessment.files_skipped += 1; continue; } };
-        assessment.files_examined += 1;
-        assessment.bytes_examined += bytes.len() as u64;
+        let metadata = match fs::symlink_metadata(&path) { Ok(m) => m, Err(_) => { a.files_skipped += 1; continue; } };
+        if metadata.file_type().is_symlink() || !metadata.is_file() { a.files_skipped += 1; continue; }
+        if metadata.len() > options.max_file_bytes { a.files_skipped += 1; continue; }
+        let bytes = match fs::read(&path) { Ok(b) => b, Err(_) => { a.files_skipped += 1; continue; } };
+        let text = match std::str::from_utf8(&bytes) { Ok(t) => t, Err(_) => { a.files_skipped += 1; continue; } };
+        a.files_examined += 1;
+        a.bytes_examined += bytes.len() as u64;
         let rel = path.strip_prefix(&root).unwrap_or(&path).to_path_buf();
         let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
 
-        if is_manifest(name) { manifests.insert(name.to_string()); dependency_files_seen = true; }
+        if is_manifest(name) {
+            dependency_files_seen = true;
+            for (ecosystem, dep_name, version) in parse_dependencies(name, text) {
+                let key = format!("{ecosystem}:{dep_name}:{version}");
+                if seen_deps.insert(key) {
+                    a.dependencies.push(Dependency { ecosystem: ecosystem.into(), name: dep_name, version_spec: version, manifest: rel.clone() });
+                }
+            }
+        }
         if is_sensitive_env_file(name) {
             sensitive_config_seen = true;
-            push_finding(&mut assessment, "ZF-CONFIG-001", "configuration", Severity::High, FindingStatus::Observed,
+            push_finding(&mut a, "ZF-CONFIG-001", "configuration", Severity::High, FindingStatus::Observed,
                 "Environment file is present in the scanned repository", &rel, None,
                 "File presence observed; Git tracking and secret validity are not inferred.",
                 "Keep real environment files outside version control; commit only sanitized templates.");
         }
-
-        let text = match std::str::from_utf8(&bytes) {
-            Ok(t) => t,
-            Err(_) => { assessment.files_skipped += 1; continue; }
-        };
         for (idx, line) in text.lines().enumerate() {
             let lower = line.to_ascii_lowercase();
             if looks_like_secret_assignment(&lower) || line.contains("-----BEGIN PRIVATE KEY-----") {
                 sensitive_config_seen = true;
-                push_finding(&mut assessment, "ZF-SECRET-001", "secrets", Severity::High, FindingStatus::NeedsReview,
+                push_finding(&mut a, "ZF-SECRET-001", "secrets", Severity::High, FindingStatus::NeedsReview,
                     "Possible hard-coded secret or private key material", &rel, Some(idx + 1),
                     &redact_line(line),
                     "Verify the value without copying it into reports; rotate exposed credentials and use a secret manager.");
             }
             if let Some((needle, severity, title, recommendation)) = validation_pattern(&lower) {
                 validation_patterns_seen = true;
-                push_finding(&mut assessment, "ZF-VALIDATION-001", "input_validation", severity, FindingStatus::NeedsReview,
-                    title, &rel, Some(idx + 1), &format!("Potential pattern: {needle}"),
-                    recommendation);
+                push_finding(&mut a, "ZF-VALIDATION-001", "input_validation", severity, FindingStatus::NeedsReview,
+                    title, &rel, Some(idx + 1), &format!("Potential pattern: {needle}"), recommendation);
             }
         }
     }
 
-    assessment.checks = vec![
+    a.dependencies.sort_by(|x, y| (&x.ecosystem, &x.name).cmp(&(&y.ecosystem, &y.name)));
+    a.checks = vec![
         Check { id: "inventory".into(), description: "Repository file inventory completed".into(), weight: 1.0, tested: true, failure_factor: 0.0 },
-        Check { id: "manifests".into(), description: "Common dependency manifest discovery".into(), weight: 1.5, tested: true, failure_factor: 0.0 },
-        Check { id: "sensitive-config".into(), description: "Sensitive configuration and possible secret patterns".into(), weight: 2.0, tested: true, failure_factor: if sensitive_config_seen { 0.0 } else { 0.0 } },
+        Check { id: "manifests".into(), description: "Common dependency manifests and direct declarations parsed".into(), weight: 1.5, tested: true, failure_factor: 0.0 },
+        Check { id: "sensitive-config".into(), description: "Sensitive configuration and possible secret patterns".into(), weight: 2.0, tested: true, failure_factor: 0.0 },
         Check { id: "validation-heuristics".into(), description: "Selected source-level validation and unsafe API heuristics".into(), weight: 2.0, tested: true, failure_factor: 0.0 },
         Check { id: "dependency-audit".into(), description: "Dependency version and advisory audit".into(), weight: 3.0, tested: false, failure_factor: 0.0 },
         Check { id: "runtime-tests".into(), description: "Runtime and integration behavior verification".into(), weight: 3.0, tested: false, failure_factor: 0.0 },
         Check { id: "sandbox".into(), description: "Isolated adversarial execution and dynamic testing".into(), weight: 4.0, tested: false, failure_factor: 0.0 },
     ];
-    if !dependency_files_seen { assessment.warnings.push("No supported dependency manifest was discovered; dependency audit coverage remains untested.".into()); }
-    if !sensitive_config_seen { assessment.warnings.push("No selected sensitive-configuration pattern was observed; this is not proof that secrets are absent.".into()); }
-    if !validation_patterns_seen { assessment.warnings.push("No selected validation anti-pattern was observed; this is not proof that source validation is safe.".into()); }
-    Ok(assessment)
+    if !dependency_files_seen { a.warnings.push("No supported dependency manifest was discovered; dependency inventory is incomplete.".into()); }
+    if !sensitive_config_seen { a.warnings.push("No selected sensitive-configuration pattern was observed; this is not proof that secrets are absent.".into()); }
+    if !validation_patterns_seen { a.warnings.push("No selected validation anti-pattern was observed; this is not proof that source validation is safe.".into()); }
+    a.warnings.push("Dependency inventory is static and partial; no package advisory database or transitive dependency resolution is used.".into());
+    Ok(a)
 }
 
-fn collect_files(dir: &Path, root: &Path, options: &ScanOptions, out: &mut Vec<PathBuf>, a: &mut Assessment) -> io::Result<()> {
-    if out.len() >= options.max_files { a.warnings.push(format!("File limit reached ({}); remaining files were not inspected.", options.max_files)); return Ok(()); }
-    let entries = match fs::read_dir(dir) { Ok(v) => v, Err(e) => { a.warnings.push(format!("Could not read {}: {e}", dir.strip_prefix(root).unwrap_or(dir).display())); return Ok(()); } };
-    for entry in entries {
-        if out.len() >= options.max_files { break; }
-        let entry = match entry { Ok(e) => e, Err(_) => { a.files_skipped += 1; continue; } };
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-        if entry.file_type().map(|t| t.is_symlink()).unwrap_or(true) { a.files_skipped += 1; continue; }
-        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            if should_skip_dir(&name) { continue; }
-            collect_files(&path, root, options, out, a)?;
-        } else if entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
-            out.push(path);
+fn parse_dependencies(filename: &str, content: &str) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    let mut section = String::new();
+    let mut in_json_deps = false;
+    let mut in_go_require = false;
+    for raw in content.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with("//") { continue; }
+        if line.starts_with('[') && line.ends_with(']') { section = line.trim_matches(['[', ']']).to_string(); }
+        if filename == "requirements.txt" || filename == "Pipfile" {
+            if let Some((name, version)) = parse_requirement(line) { out.push(("python".into(), name, version)); }
+        } else if filename == "Cargo.toml" && (section == "dependencies" || section == "dev-dependencies" || section == "build-dependencies") {
+            if let Some((name, version)) = line.split_once('=') {
+                let name = name.trim().trim_matches('"').to_string();
+                if valid_package_name(&name) {
+                    let rhs = version.trim();
+                    let version = if rhs.starts_with('"') { rhs.trim_matches(',').trim_matches('"').to_string() }
+                        else if let Some(pos) = rhs.find("version") { rhs[pos..].split('"').nth(1).unwrap_or("unspecified").to_string() }
+                        else { "unspecified".into() };
+                    out.push(("cargo".into(), name, version));
+                }
+            }
+        } else if filename == "package.json" {
+            if line.contains("\"dependencies\"") || line.contains("\"devDependencies\"") || line.contains("\"peerDependencies\"") || line.contains("\"optionalDependencies\"") { in_json_deps = true; continue; }
+            if in_json_deps && line.starts_with('}') { in_json_deps = false; continue; }
+            if in_json_deps {
+                if let Some((name, version)) = parse_json_pair(line) { out.push(("npm".into(), name, version)); }
+            }
+        } else if filename == "go.mod" {
+            if line == "require (" { in_go_require = true; continue; }
+            if in_go_require && line == ")" { in_go_require = false; continue; }
+            if in_go_require || line.starts_with("require ") {
+                let parts: Vec<&str> = line.trim_start_matches("require ").split_whitespace().collect();
+                if parts.len() >= 2 { out.push(("go".into(), parts[0].into(), parts[1].into())); }
+            }
         }
     }
-    Ok(())
+    out
 }
 
-fn should_skip_dir(n: &str) -> bool {
-    matches!(n, ".git" | "node_modules" | "target" | "vendor" | ".venv" | "venv" | "__pycache__" | ".next" | "dist" | "build" | ".terraform" | ".idea")
+fn parse_requirement(line: &str) -> Option<(String, String)> {
+    let clean = line.split('#').next()?.trim();
+    if clean.is_empty() || clean.starts_with('-') { return None; }
+    let end = clean.find(|c: char| matches!(c, '=' | '<' | '>' | '!' | '~' | ';' | '[')).unwrap_or(clean.len());
+    let name = clean[..end].trim();
+    if !valid_package_name(name) { return None; }
+    Some((name.to_string(), clean[end..].trim().to_string().if_empty("unspecified")))
+}
+trait EmptyDefault { fn if_empty(self, fallback: &str) -> String; }
+impl EmptyDefault for String { fn if_empty(self, fallback: &str) -> String { if self.is_empty() { fallback.into() } else { self } } }
+
+fn parse_json_pair(line: &str) -> Option<(String, String)> {
+    let mut quoted = line.split('"').skip(1);
+    let name = quoted.next()?.trim().to_string();
+    let version = quoted.next()?.split(':').next()?;
+    let version = version.trim().trim_start_matches(':').trim().trim_matches(',').trim_matches('"').to_string();
+    if valid_package_name(&name) { Some((name, version)) } else { None }
+}
+fn valid_package_name(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '/'))
 }
 fn is_manifest(n: &str) -> bool {
-    matches!(n, "Cargo.toml" | "Cargo.lock" | "package.json" | "package-lock.json" | "pnpm-lock.yaml" | "yarn.lock" | "pyproject.toml" | "requirements.txt" | "Pipfile" | "Pipfile.lock" | "go.mod" | "go.sum" | "pom.xml" | "build.gradle" | "Gemfile" | "composer.json")
+    matches!(n, "Cargo.toml" | "package.json" | "requirements.txt" | "Pipfile" | "go.mod" | "pyproject.toml" | "Gemfile" | "composer.json" | "pom.xml" | "build.gradle")
 }
 fn is_sensitive_env_file(n: &str) -> bool { n == ".env" || n.starts_with(".env.") && n != ".env.example" && n != ".env.template" }
 fn looks_like_secret_assignment(l: &str) -> bool {
@@ -139,17 +176,37 @@ fn validation_pattern(l: &str) -> Option<(&'static str, Severity, &'static str, 
 fn push_finding(a: &mut Assessment, id: &str, category: &str, severity: Severity, status: FindingStatus, title: &str, path: &Path, line: Option<usize>, evidence: &str, recommendation: &str) {
     a.findings.push(Finding { id: id.into(), category: category.into(), severity, status, title: title.into(), path: path.to_path_buf(), line, evidence: evidence.into(), recommendation: recommendation.into() });
 }
+fn should_skip_dir(n: &str) -> bool {
+    matches!(n, ".git" | "node_modules" | "target" | "vendor" | ".venv" | "venv" | "__pycache__" | ".next" | "dist" | "build" | ".terraform" | ".idea")
+}
+fn collect_files(dir: &Path, root: &Path, options: &ScanOptions, out: &mut Vec<PathBuf>, a: &mut Assessment) -> io::Result<()> {
+    if out.len() >= options.max_files { a.warnings.push(format!("File limit reached ({}); remaining files were not inspected.", options.max_files)); return Ok(()); }
+    let entries = match fs::read_dir(dir) { Ok(v) => v, Err(e) => { a.warnings.push(format!("Could not read {}: {e}", dir.strip_prefix(root).unwrap_or(dir).display())); return Ok(()); } };
+    for entry in entries {
+        if out.len() >= options.max_files { break; }
+        let entry = match entry { Ok(e) => e, Err(_) => { a.files_skipped += 1; continue; } };
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if entry.file_type().map(|t| t.is_symlink()).unwrap_or(true) { a.files_skipped += 1; continue; }
+        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            if !should_skip_dir(&name) { collect_files(&path, root, options, out, a)?; }
+        } else if entry.file_type().map(|t| t.is_file()).unwrap_or(false) { out.push(path); }
+    }
+    Ok(())
+}
+fn push_finding(a: &mut Assessment, id: &str, category: &str, severity: Severity, status: FindingStatus, title: &str, path: &Path, line: Option<usize>, evidence: &str, recommendation: &str) {
+    a.findings.push(Finding { id: id.into(), category: category.into(), severity, status, title: title.into(), path: path.to_path_buf(), line, evidence: evidence.into(), recommendation: recommendation.into() });
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn redaction_never_returns_assignment_value() {
-        assert_eq!(redact_line("API_KEY=super-secret-value"), "API_KEY = [REDACTED]");
-    }
-    #[test] fn ignored_directories_are_explicit() {
-        assert!(should_skip_dir("node_modules"));
-        assert!(!should_skip_dir("src"));
-    }
+    #[test] fn redaction_never_returns_assignment_value() { assert_eq!(redact_line("API_KEY=super-secret-value"), "API_KEY = [REDACTED]"); }
     #[test] fn manifests_are_detected() { assert!(is_manifest("Cargo.toml")); }
     #[test] fn tls_false_is_flagged() { assert!(validation_pattern("verify=false").is_some()); }
+    #[test] fn requirements_are_extracted() { assert_eq!(parse_requirement("requests>=2.31").unwrap(), ("requests".into(), ">=2.31".into())); }
+    #[test] fn cargo_dependencies_are_extracted() {
+        let parsed = parse_dependencies("Cargo.toml", "[dependencies]\nserde = \"1.0\"\n");
+        assert_eq!(parsed[0], ("cargo".into(), "serde".into(), "1.0".into()));
+    }
 }
