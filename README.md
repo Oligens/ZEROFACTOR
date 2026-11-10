@@ -28,7 +28,7 @@ Lockfile graph inventory (Python 3.11+):
 python3 scripts/dependency_graph.py ../atibon --output reports/dependency-graph.json
 ```
 
-The extractor does not install packages or execute target code. Review the graph_complete field and limitations before relying on the result.
+The extractor does not install packages or execute target code. Review the graph_complete field and limitations before relying on the result.\n\nCombine static, dependency, advisory and evidence records into one dashboard-ready assessment:\n\n```bash\npython3 scripts/assemble_assessment.py --report reports/assessment.json --dependencies reports/dependency-graph.json --advisories reports/advisory-results.json --evidence reports/evidence.json --output reports/assessment-platform.json\n```
 
 ## Dependency and advisory checks
 
