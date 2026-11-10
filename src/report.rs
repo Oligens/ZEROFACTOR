@@ -28,7 +28,28 @@ pub fn markdown(a: &Assessment) -> String {
     for f in &a.findings { write_finding(&mut out, f); }
     let _ = writeln!(out, "## Coverage by check\n| Check | Tested | Weight | Failure factor |\n|---|---:|---:|---:|");
     for c in &a.checks { let _ = writeln!(out, "| {} | {} | {:.1} | {:.2} |", c.id, c.tested, c.weight, c.failure_factor); }
-    if !a.warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{",
+    if !a.warnings.is_empty() {
+        let _ = writeln!(out, "\n## Limitations and warnings\n");
+        for w in &a.warnings { let _ = writeln!(out, "- {w}"); }
+    }
+    out
+}
+fn write_dependency(out: &mut String, d: &Dependency) {
+    let _ = writeln!(out, "| {} | {} | {} | {} |", d.ecosystem, d.name, d.version_spec, d.manifest.display());
+}
+fn write_finding(out: &mut String, f: &Finding) {
+    let _ = writeln!(out, "### [{}] {} — {}\n", f.severity.as_str().to_uppercase(), f.title, f.status.as_str());
+    let _ = writeln!(out, "- **ID:** {}", f.id);
+    let _ = writeln!(out, "- **Location:** {}{}", f.path.display(), f.line.map(|n| format!(":{n}")).unwrap_or_default());
+    let _ = writeln!(out, "- **Category:** {}", f.category);
+    let _ = writeln!(out, "- **Evidence:** `{}`", f.evidence.replace('`', "'"));
+    let _ = writeln!(out, "- **Recommendation:** {}\n", f.recommendation);
+}
+pub fn json(a: &Assessment) -> String {
+    let evidence_records=serde_json::to_string(&a.evidence.records).unwrap_or_else(|_|"[]".into());
+    let impact_summary=serde_json::to_string(&a.evidence.impact_summary()).unwrap_or_else(|_|"{}".into());
+    let findings = a.findings.iter().map(|f| format!(
+        "{{\"id\":{},\"category\":{},\"severity\":{},\"status\":{},\"title\":{},\"path\":{},\"line\":{},\"evidence\":{},\"recommendation\":{}}}",
         q(&f.id), q(&f.category), q(f.severity.as_str()), q(f.status.as_str()), q(&f.title), q(&f.path.display().to_string()),
         f.line.map(|n| n.to_string()).unwrap_or_else(|| "null".into()), q(&f.evidence), q(&f.recommendation)
     )).collect::<Vec<_>>().join(",");
@@ -41,7 +62,7 @@ pub fn markdown(a: &Assessment) -> String {
         "{{\"id\":{},\"description\":{},\"weight\":{},\"tested\":{},\"failure_factor\":{}}}",
         q(&c.id), q(&c.description), c.weight, c.tested, c.failure_factor
     )).collect::<Vec<_>>().join(",");
-    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{}}}",
+    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{}}",
         q(&a.root.display().to_string()), a.files_examined, a.files_skipped, a.bytes_examined,
         a.zfi().map(|v| v.to_string()).unwrap_or_else(|| "null".into()), a.coverage(), components, dependencies, findings, checks,
         a.warnings.iter().map(|w| q(w)).collect::<Vec<_>>().join(","), evidence_records, impact_summary)
