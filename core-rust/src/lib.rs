@@ -7,9 +7,11 @@ pub mod attack_surface;
 pub mod evidence;
 pub mod model;
 pub mod resilience;
+pub mod reporting;
 pub mod scope;
 pub mod semantic_engine;
 pub mod simulation;
+pub mod target_intelligence;
 pub mod zero_factor;
 pub mod zfi;
 
