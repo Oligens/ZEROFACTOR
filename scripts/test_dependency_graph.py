@@ -21,6 +21,14 @@ class LockGraphTests(unittest.TestCase):
   lock='foo@^1.0.0:\n  version "1.2.0"\n  dependencies:\n    bar "^2.0.0"\n\nbar@^2.0.0:\n  version "2.1.0"\n'
   d=self.run_script({"yarn.lock":lock})
   self.assertEqual(next(x for x in d["packages"] if x["name"]=="foo")["dependencies"],["bar@2.1.0"])
+ def test_composer_transitive_edge(self):
+  lock={"packages":[{"name":"vendor/app","version":"1.0.0","require":{"vendor/lib":"^2.0.0"}},{"name":"vendor/lib","version":"2.1.0","require":{}}]}
+  d=self.run_script({"composer.lock":json.dumps(lock)})
+  self.assertEqual(next(x for x in d["packages"] if x["name"]=="vendor/app")["dependencies"],["vendor/lib@2.1.0"])
+ def test_gemfile_lock_edge(self):
+  lock='GEM\n  remote: https://rubygems.org/\n  specs:\n    rack (2.2.8)\n    rack-protection (3.0.0)\n      rack (>= 1.6.0)\n\nPLATFORMS\n  ruby\n'
+  d=self.run_script({"Gemfile.lock":lock})
+  self.assertEqual(next(x for x in d["packages"] if x["name"]=="rack-protection")["dependencies"],["rack@2.2.8"])
  def test_poetry_exact_version_inventory_is_explicitly_incomplete(self):
   d=self.run_script({"poetry.lock":'[[package]]\nname = "urllib3"\nversion = "2.2.1"\n'})
   self.assertEqual(d["packages"][0]["version"],"2.2.1")
