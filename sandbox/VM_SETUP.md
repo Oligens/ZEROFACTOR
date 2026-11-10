@@ -15,6 +15,7 @@ Recommended starting profile (adjust after measuring workload):
 - Current security updates and Linux kernel 5.6 or newer.
 - No inbound public ports. Restrict outbound traffic to GitHub Actions endpoints and approved package/image sources.
 - No production credentials, SSH agent forwarding, cloud instance role, mounted host home, or shared Docker socket.
+- Install `jq`, `nftables`, `python3`, `coreutils` (for `timeout`) and Docker before locking down egress.
 - Snapshot the clean VM before runner registration. Destroy/revert it after each validation session.
 
 ## 2. Install Docker Engine
@@ -71,7 +72,13 @@ docker image inspect local/zerofactor-test-runner:locked
 
 Set the repository Actions variable `ZEROFACTOR_TEST_IMAGE` to the exact local image reference. The workflow fails if the variable is empty or the image is absent. Do not put credentials in this variable.
 
-## 5. Register a one-job GitHub runner
+The offline controlled-module fixture adapter uses a separate minimal image containing Python 3.11+ and the standard library. Load it before the egress lockdown and set `ZEROFACTOR_MODULE_IMAGE` in the VM runner service environment to its immutable `name@sha256:<64-hex-digest>` reference. The image must not contain credentials or network clients. The adapter requires `jq` and `timeout` on the host and verifies the fixture ID against `fixture_ids` in the scope file.
+
+## 5. Apply VM egress policy
+
+Follow [EGRESS_POLICY.md](EGRESS_POLICY.md). Apply the nftables default-drop policy from the VM console only after the approved fixed HTTPS proxy is ready. Configure the ephemeral runner service with `HTTPS_PROXY` / `HTTP_PROXY`; the cloud security group must independently deny all direct egress and all new inbound connections. The gVisor fixture containers themselves run with `--network=none`.
+
+## 6. Register a one-job GitHub runner
 
 Prefer an ephemeral runner and a clean VM image for every job. Create a repository-scoped runner from **Settings → Actions → Runners → New self-hosted runner** and use the current commands/token displayed by GitHub. Configure labels `linux,gvisor` and ephemeral mode:
 
@@ -82,13 +89,13 @@ Prefer an ephemeral runner and a clean VM image for every job. Create a reposito
 
 The token is short-lived: do not commit it, paste it into workflow YAML, or save it in repository variables. Use a dedicated unprivileged runner account; note that Docker access grants effective root privileges. Destroy or revert the VM after the single job.
 
-## 6. Protect the workflow before running it
+## 7. Protect the workflow before running it
 
 In **Settings → Environments**, create `gvisor-lab-approval` and configure required reviewers. Restrict deployment branches to `main`. Do not add secrets to this environment. Keep the repository Actions token read-only.
 
 The workflow is `workflow_dispatch` only and runs only when dispatched from `main`. It checks out `main`, runs the host smoke test, and uploads host metadata and logs even when the smoke test fails. Never change it to run on `pull_request`, `pull_request_target`, or arbitrary branch refs on this self-hosted runner.
 
-## 7. Execute and retain evidence
+## 8. Execute and retain evidence
 
 1. Confirm the VM snapshot, runner labels, environment reviewers, and preloaded image.
 2. Start the ephemeral runner.
