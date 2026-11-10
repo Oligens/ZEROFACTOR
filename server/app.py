@@ -8,6 +8,8 @@ from wsgiref.simple_server import make_server
 
 DB=os.environ.get("ZEROFACTOR_DB","zerofactor.sqlite3")
 SESSION_SECONDS=8*60*60
+STATIC_ROOT=Path(__file__).resolve().parent.parent/"dashboard"
+STATIC_FILES={"/":("index.html","text/html; charset=utf-8"),"/dashboard":("index.html","text/html; charset=utf-8"),"/dashboard/":("index.html","text/html; charset=utf-8"),"/dashboard/app.js":("app.js","text/javascript; charset=utf-8"),"/dashboard/style.css":("style.css","text/css; charset=utf-8")}
 ROLES={"owner":3,"analyst":2,"viewer":1}
 
 def connect():
@@ -41,6 +43,12 @@ def response(start,status,payload,headers=None):
 
 def app(environ,start):
     method=environ.get("REQUEST_METHOD","GET"); path=unquote(environ.get("PATH_INFO","/"))
+    if method=="GET" and path in STATIC_FILES:
+        filename,content_type=STATIC_FILES[path]
+        try: payload=(STATIC_ROOT/filename).read_bytes()
+        except OSError: return response(start,"404 Not Found",{"error":"static_asset_missing"})
+        start("200 OK",[("Content-Type",content_type),("Content-Length",str(len(payload))),("Cache-Control","no-store"),("X-Content-Type-Options","nosniff"),("Content-Security-Policy","default-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")])
+        return [payload]
     try:
         length=int(environ.get("CONTENT_LENGTH") or 0)
         if length>1_000_000:return response(start,"413 Payload Too Large",{"error":"body_too_large"})
@@ -73,7 +81,8 @@ def app(environ,start):
             if token:db.execute("DELETE FROM sessions WHERE token_hash=?",(hashlib.sha256(token.value.encode()).hexdigest(),));db.commit()
             return response(start,"200 OK",{"logged_out":True},[("Set-Cookie","zf_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"),("Set-Cookie","zf_csrf=; SameSite=Strict; Path=/; Max-Age=0")])
         if not user:return response(start,"401 Unauthorized",{"error":"authentication_required"})
-        if path=="/api/me" and method=="GET":return response(start,"200 OK",{"user":{"id":user["id"],"email":user["email"]}})\n        if path=="/api/projects" and method=="GET":
+        if path=="/api/me" and method=="GET":return response(start,"200 OK",{"user":{"id":user["id"],"email":user["email"]}})\n        if path=="/api/me" and method=="GET":return response(start,"200 OK",{"user":{"id":user["id"],"email":user["email"]}})
+        if path=="/api/projects" and method=="GET":
             rows=db.execute("SELECT p.id,p.name,p.created_at,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=? ORDER BY p.created_at DESC",(user["id"],)).fetchall()
             return response(start,"200 OK",{"projects":[dict(x) for x in rows]})
         if path=="/api/projects" and method=="POST":
