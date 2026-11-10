@@ -20,8 +20,10 @@ jobs:
         run: cargo generate-lockfile
       - name: Native lockfile inventory and graph
         run: python3 scripts/dependency_graph.py . --output dependency-graph.json
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+      - name: Install prebuilt cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
       - name: RustSec advisory audit
         run: cargo audit --deny warnings
       - name: Install OSV-Scanner
