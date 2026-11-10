@@ -57,6 +57,7 @@
       "uniqueItems": true,
       "items": {
         "enum": [
+          "HTTP_POSTURE",
           "AUTH",
           "INPUT",
           "FILE",
