@@ -54,9 +54,19 @@ Configure these repository-level values before expecting the workflow to pass:
 
 - Actions variable `NEON_PROJECT_ID`: the dedicated ZEROFACTOR Neon project ID.
 - Actions secret `NEON_API_KEY`: a Neon API key with permission to create and delete branches in that project.
+- Actions secret `VERCEL_TOKEN`: a Vercel access token restricted to the ZEROFACTOR project/team, with permission to manage project environment variables and create Preview deployments.
 
-Do not put the API key in repository files, workflow output, or issue comments. The workflow never prints the generated database URL.
+Set `VERCEL_TOKEN` in GitHub → Settings → Secrets and variables → Actions before expecting the Vercel wiring step to pass. Do not put either API key in repository files, workflow output, or issue comments. The workflow masks the generated Neon connection string and never prints it.
 
-### Important Vercel Preview boundary
+### Vercel Preview branch wiring
 
-This workflow creates and validates an isolated database for CI. It does not automatically rewrite Vercel environment variables or route a Vercel deployment to the ephemeral branch. The existing Vercel `DATABASE_URL` remains scoped to the repair Preview branch; Production variables and deployments are unchanged. Wiring each ephemeral Neon URL into Vercel would additionally require a dedicated, least-privilege Vercel token stored as a GitHub Actions secret and a carefully scoped Preview-only environment-variable lifecycle. Do not add that token or broaden the environment scope without a separate review.
+After Neon migration and schema checks pass, the workflow:
+
+1. Creates or updates only the `DATABASE_URL` variable whose target is Preview and whose Git branch exactly matches the PR head branch.
+2. Stores the connection as an encrypted, runtime-readable Vercel environment variable. It does not modify Production or Development variables.
+3. Requests a fresh Vercel Preview deployment for the exact PR head commit so the new variable is applied.
+4. When the PR closes, removes only that matching branch-scoped Preview variable, then deletes only the corresponding `preview-pr-<PR number>` Neon branch.
+
+The Vercel project and team identifiers are fixed in this workflow to prevent accidentally writing to another project. Fork PRs are skipped. If multiple matching branch-scoped `DATABASE_URL` variables are found, the workflow fails closed rather than guessing.
+
+Vercel environment changes apply to new deployments, not already-built deployments. The workflow therefore explicitly requests a new Preview deployment after updating the variable. Production variables and deployments are never targeted.

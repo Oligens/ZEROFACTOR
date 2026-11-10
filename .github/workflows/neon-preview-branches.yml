@@ -19,7 +19,7 @@ jobs:
       github.event.action != 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout reviewed PR source
         uses: actions/checkout@v4
@@ -84,14 +84,156 @@ jobs:
           " | grep -qx 'schema_ok'
           psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' | grep -qx '1'
 
+      - name: Set branch-scoped Vercel Preview DATABASE_URL and redeploy
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: prj_VRnNubtMUlTEsTLZZoSFmNGHxAMb
+          VERCEL_TEAM_ID: team_ZkrjG9yZj91sT2kR5sbkzMkN
+          VERCEL_GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${VERCEL_TOKEN}" ]]; then
+            echo "::error::Missing GitHub Actions secret VERCEL_TOKEN. Add a least-privilege Vercel token before enabling Vercel Preview wiring."
+            exit 1
+          fi
+          if [[ -z "${DATABASE_URL}" || -z "${VERCEL_GIT_BRANCH}" ]]; then
+            echo "::error::Missing Neon connection string or Git branch."
+            exit 1
+          fi
+          echo "::add-mask::${DATABASE_URL}"
+          export DATABASE_URL VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID VERCEL_GIT_BRANCH GITHUB_SHA
+          node <<'NODE'
+          const api = 'https://api.vercel.com';
+          const headers = {
+            Authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
+            'Content-Type': 'application/json',
+          };
+          const project = process.env.VERCEL_PROJECT_ID;
+          const team = process.env.VERCEL_TEAM_ID;
+          const branch = process.env.VERCEL_GIT_BRANCH;
+          const query = `teamId=${encodeURIComponent(team)}`;
+          async function request(path, options = {}) {
+            const response = await fetch(`${api}${path}`, {
+              ...options,
+              headers: { ...headers, ...(options.headers || {}) },
+            });
+            const body = await response.text();
+            if (!response.ok) {
+              throw new Error(`Vercel API ${response.status}: ${body.slice(0, 1200)}`);
+            }
+            return body ? JSON.parse(body) : {};
+          }
+
+          const list = await request(
+            `/v10/projects/${project}/env?gitBranch=${encodeURIComponent(branch)}&${query}`
+          );
+          const envs = Array.isArray(list.envs) ? list.envs : [];
+          const matches = envs.filter((item) =>
+            item.key === 'DATABASE_URL' &&
+            item.gitBranch === branch &&
+            Array.isArray(item.target) &&
+            item.target.includes('preview')
+          );
+          if (matches.length > 1) {
+            throw new Error('More than one branch-scoped Preview DATABASE_URL exists; refusing ambiguous update.');
+          }
+
+          const payload = {
+            key: 'DATABASE_URL',
+            value: process.env.DATABASE_URL,
+            target: ['preview'],
+            gitBranch: branch,
+            comment: `ZEROFACTOR isolated Neon database for PR ${process.env.GITHUB_REF_NAME || 'preview'}`,
+          };
+          if (matches.length === 1) {
+            await request(`/v9/projects/${project}/env/${matches[0].id}?${query}`, {
+              method: 'PATCH',
+              body: JSON.stringify(payload),
+            });
+            console.log('Updated branch-scoped Vercel Preview DATABASE_URL without changing its existing secret type.');
+          } else {
+            await request(`/v10/projects/${project}/env?${query}`, {
+              method: 'POST',
+              body: JSON.stringify({ ...payload, type: 'encrypted' }),
+            });
+            console.log('Created branch-scoped Vercel Preview DATABASE_URL.');
+          }
+
+          const deployment = await request(`/v13/deployments?${query}`, {
+            method: 'POST',
+            body: JSON.stringify({
+              name: 'zerofactor',
+              project,
+              target: 'preview',
+              gitSource: {
+                type: 'github',
+                org: 'Oligens',
+                repo: 'ZEROFACTOR',
+                ref: branch,
+                sha: process.env.GITHUB_SHA,
+              },
+            }),
+          });
+          console.log(`Triggered Preview deployment: ${deployment.url || deployment.id || 'accepted'}`);
+          NODE
+
   delete-preview-branch:
-    name: Delete closed PR Neon branch
+    name: Delete closed PR Vercel and Neon preview resources
     if: >-
       github.event.action == 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
+      - name: Remove only this PR branch-scoped Vercel Preview DATABASE_URL
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: prj_VRnNubtMUlTEsTLZZoSFmNGHxAMb
+          VERCEL_TEAM_ID: team_ZkrjG9yZj91sT2kR5sbkzMkN
+          VERCEL_GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${VERCEL_TOKEN}" ]]; then
+            echo "::warning::VERCEL_TOKEN is not configured; Vercel branch-scoped environment cleanup was skipped."
+            exit 0
+          fi
+          export VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID VERCEL_GIT_BRANCH
+          node <<'NODE'
+          const api = 'https://api.vercel.com';
+          const headers = { Authorization: `Bearer ${process.env.VERCEL_TOKEN}` };
+          const project = process.env.VERCEL_PROJECT_ID;
+          const team = process.env.VERCEL_TEAM_ID;
+          const branch = process.env.VERCEL_GIT_BRANCH;
+          const query = `teamId=${encodeURIComponent(team)}`;
+          const url = `${api}/v10/projects/${project}/env?gitBranch=${encodeURIComponent(branch)}&${query}`;
+          const response = await fetch(url, { headers });
+          const body = await response.text();
+          if (!response.ok) throw new Error(`Vercel list env failed: ${response.status} ${body.slice(0, 1000)}`);
+          const data = body ? JSON.parse(body) : {};
+          const matches = (data.envs || []).filter((item) =>
+            item.key === 'DATABASE_URL' &&
+            item.gitBranch === branch &&
+            Array.isArray(item.target) &&
+            item.target.includes('preview')
+          );
+          for (const item of matches) {
+            const deleted = await fetch(
+              `${api}/v9/projects/${project}/env/${item.id}?${query}`,
+              { method: 'DELETE', headers }
+            );
+            if (!deleted.ok) {
+              const message = await deleted.text();
+              throw new Error(`Vercel env cleanup failed: ${deleted.status} ${message.slice(0, 1000)}`);
+            }
+          }
+          console.log(`Removed ${matches.length} matching branch-scoped Preview variable(s).`);
+          NODE
+
       - name: Delete only this PR Neon branch
         uses: neondatabase/delete-branch-action@v3
         continue-on-error: true
