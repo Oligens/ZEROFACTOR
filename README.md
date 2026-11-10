@@ -62,6 +62,7 @@ The HTTP runner requires an unexpired authorization scope, exact HTTPS host allo
 - [Roadmap](docs/ROADMAP.md)
 - [Dependency intelligence and CVE policy](docs/DEPENDENCY_INTELLIGENCE.md)
 - [Controlled testing and evidence](docs/CONTROLLED_TESTING.md)
+- [Phase 3 controlled module contracts](docs/CONTROLLED_MODULES.md)
 - [Dashboard API and RBAC](docs/DASHBOARD.md)
 - [Sandbox instructions](sandbox/README.md)
 
