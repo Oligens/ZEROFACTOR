@@ -7,6 +7,13 @@
   "allowed_hosts": ["fixture.example.test"],
   "expires_at": "2099-01-01T00:00:00Z",
   "modules": ["AUTH", "INPUT", "FILE", "RATE", "RECOVERY"],
+  "fixture_ids": [
+    "auth-synthetic-baseline",
+    "input-synthetic-boundaries",
+    "file-synthetic-access",
+    "rate-passive-observation",
+    "recovery-operator-snapshot"
+  ],
   "request_budget": 1,
   "timeout_seconds": 8
 }

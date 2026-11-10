@@ -34,6 +34,8 @@ class ControlledFixtureModuleTests(unittest.TestCase):
         self.assertEqual(json.loads(output_path.read_text())["module"], module)
         self.assertEqual(result["safety"]["network_connections"], 0)
         self.assertEqual(result["safety"]["target_files_read"], 0)
+        self.assertEqual(result["evidence_records"][0]["authorization_expires_at"], "2099-01-01T00:00:00+00:00")
+        self.assertEqual(result["evidence_records"][0]["classification"], "synthetic_fixture")
         return result
 
     def test_auth_denies_unauthenticated_and_cross_project_access(self):
@@ -139,6 +141,13 @@ class ControlledFixtureModuleTests(unittest.TestCase):
         fixture.write_text(json.dumps({"module": "RATE", "case_id": "rate", "observations": [{"elapsed_ms": 0, "status": 200}]}))
         with self.assertRaisesRegex(ValueError, "explicitly authorize"):
             evaluate("RATE", self.scope, fixture, self.root / "out.json",
+                     now=dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc))
+
+    def test_unsafe_case_identifier_is_rejected(self):
+        fixture = self.root / "unsafe.json"
+        fixture.write_text(json.dumps({"module": "AUTH", "case_id": "../outside", "observations": []}))
+        with self.assertRaisesRegex(ValueError, "safe"):
+            evaluate("AUTH", self.scope, fixture, self.root / "out.json",
                      now=dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc))
 
     def test_module_mismatch_is_rejected(self):
