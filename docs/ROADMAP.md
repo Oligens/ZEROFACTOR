@@ -8,25 +8,40 @@
 - [x] Selected validation / unsafe API heuristics
 - [x] Findings, JSON and Markdown reports
 - [x] Experimental ZFI and explicit coverage
-- [x] Unit and integration test scaffolding
 
-## Phase 2 — Deep repository intelligence
-- [ ] Git tracked-file and history analysis (without exposing secret values)
-- [ ] Language-aware parsing / AST analysis
-- [ ] Complete lockfile parsing and reproducible SBOM
-- [ ] Advisory ingestion with source, timestamp and version provenance
-- [ ] Framework-specific configuration analyzers
-- [ ] SARIF export
+## Phase 2 — Dependency and supply-chain intelligence
+- [x] CI integration for RustSec cargo-audit
+- [x] CI integration for OSV-Scanner (currently non-blocking baseline)
+- [x] CI generation of SPDX JSON and CycloneDX JSON artifacts
+- [ ] Native lockfile parsers for Cargo, npm/pnpm/yarn, Python and Go
+- [ ] Canonical dependency graph with platform/feature provenance
+- [ ] Advisory normalization, deduplication and timestamped database snapshots
+- [ ] Reachability and exploitability evidence; never infer from CVE presence alone
+- [ ] SBOM validation, license metadata and completeness reporting
 
 ## Phase 3 — Controlled verification
-- [ ] Authorization manifest and signed scope
-- [ ] Isolated disposable sandbox
-- [ ] Safe test-case runner with resource limits and kill switch
-- [ ] Runtime validation and regression evidence
+- [x] Explicit scope file format and guarded gVisor launcher foundation
+- [x] Network-disabled, read-only, least-privilege resource-constrained container launch
+- [ ] Signed authorization manifests and immutable audit trail
+- [ ] Dedicated VM-backed sandbox orchestration, lifecycle and cleanup
+- [ ] Isolation escape and resource-boundary verification suite
+- [ ] Safe deterministic test-case runner, kill switch and evidence capture
+- [ ] Controlled penetration-test modules for explicitly authorized lab targets
+- [ ] Measured impact and repeatable pre/post-test baselines
 
-## Phase 4 — Platform
-- [ ] Dashboard and multi-project workspaces
-- [ ] Signed evidence bundles
-- [ ] CI integrations and policy gates
+## Phase 4 — Evidence and platform
+- [x] Local JSON report dashboard foundation
+- [ ] Multi-project workspaces and persistent assessment history
+- [ ] Authentication, RBAC and tenant isolation
+- [ ] Signed evidence bundles and chain of custody
+- [ ] SARIF and professional PDF exports
+- [ ] CI policy gates and integrations
 - [ ] Independent ATIBON assessment profile
-- [ ] Enterprise reporting and audit trail
+- [ ] Hosted dashboard, audit trail and operational monitoring
+
+## Release gates
+A feature is not considered complete until automated tests pass, security controls
+are independently verified, artifacts are reproducible, and limitations are
+explicitly reported. A workflow being configured does not mean a scan has passed;
+a sandbox launcher does not prove host isolation; and a test finding does not
+prove exploitability without reproducible evidence.

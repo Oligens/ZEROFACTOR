@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>ZEROFACTOR | Security Intelligence</title><link rel="stylesheet" href="style.css"></head>
+<body><header><div><p class="eyebrow">INDEPENDENT SECURITY VALIDATION</p><h1>ZEROFACTOR</h1><p class="muted">Evidence-led repository assessment</p></div><label class="upload">Import JSON report <input id="reportFile" type="file" accept="application/json,.json"></label></header>
+<main><section class="notice" id="notice">No assessment loaded. Generate a JSON report and import it here.</section>
+<section class="metrics"><article><span>Files examined</span><strong id="files">—</strong></article><article><span>Findings</span><strong id="findings">—</strong></article><article><span>Direct dependencies</span><strong id="deps">—</strong></article><article><span>Coverage</span><strong id="coverage">—</strong></article><article><span>ZFI</span><strong id="zfi">—</strong></article></section>
+<section class="grid"><article class="panel"><h2>Findings by severity</h2><div id="severity" class="bars empty">Import a report.</div></article><article class="panel"><h2>Assessment coverage</h2><div id="checks" class="check-list empty">No checks loaded.</div></article></section>
+<section class="panel"><h2>Findings register</h2><div class="table-wrap"><table><thead><tr><th>Severity</th><th>Finding</th><th>Status</th><th>Location</th></tr></thead><tbody id="findingRows"><tr><td colspan="4">No data</td></tr></tbody></table></div></section>
+<section class="panel"><h2>Dependency inventory</h2><div class="table-wrap"><table><thead><tr><th>Ecosystem</th><th>Package</th><th>Declared version</th><th>Manifest</th></tr></thead><tbody id="depRows"><tr><td colspan="4">No data</td></tr></tbody></table></div></section>
+<section class="panel"><h2>Warnings and limitations</h2><ul id="warnings"><li>Import a report.</li></ul></section></main>
+<footer>ZEROFACTOR · Local report viewer · A clean static scan is not proof of security.</footer><script src="app.js"></script></body></html>

@@ -1,0 +1,10 @@
+{
+  "authorized": false,
+  "target_path": "/absolute/path/to/disposable-target",
+  "allowed_image": "local/zerofactor-test-runner:locked",
+  "expires_at": "2099-01-01T00:00:00Z",
+  "owner": "replace-with-authorizing-owner",
+  "purpose": "authorized isolated validation",
+  "allowed_tests": ["static-fixture", "non-destructive-regression"],
+  "stop_conditions": ["unexpected network attempt", "resource limit exceeded", "scope mismatch"]
+}

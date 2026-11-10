@@ -2,13 +2,15 @@
 
 **Independent Cybersecurity Validation & Adversarial Testing Platform**
 
-ZEROFACTOR evaluates whether security guarantees declared by a system are supported by source evidence and controlled tests. It is independent of the systems it assesses and is designed to evaluate ATIBON and third-party repositories without becoming part of their trusted computing base.
+ZEROFACTOR evaluates whether security guarantees declared by a system are supported by source evidence and controlled tests. It is independent of assessed systems and is designed to assess ATIBON and third-party repositories without becoming part of their trusted computing base.
 
 > Core principle: test security properties, reproduce failures safely, measure demonstrated impact, and preserve verifiable evidence.
 
 ## Current status
 
-**Phase 1 — Repository Intelligence MVP implemented on a feature branch.** The first engine performs bounded, local, read-only source inspection. It does not execute target code, clone repositories, install packages, contact remote services, or modify the target.
+The repository intelligence MVP is merged into main. This feature branch adds the first security-platform foundations: CI dependency/advisory checks, SPDX and CycloneDX SBOM artifact generation, a guarded gVisor execution launcher, impact/evidence methodology, and a local JSON dashboard.
+
+**These additions are foundations, not a claim that all eight platform objectives are complete.** The local scanner still parses selected direct dependency declarations only. Complete transitive resolution, complete cross-ecosystem CVE coverage, reachability analysis, verified exploitability, production-grade sandbox orchestration, active penetration-test modules, measured attack impact, and a hosted multi-user dashboard remain incomplete and require validation.
 
 ## Quick start
 
@@ -20,43 +22,52 @@ cargo run -- scan --path ../atibon --format md --out reports/atibon-assessment.m
 cargo run -- scan --path ../atibon --format json --out reports/atibon-assessment.json
 ```
 
-Or build a binary:
+Import the JSON report into dashboard/index.html to view local assessment metrics.
+
+## Security and supply-chain checks
+
+The GitHub Actions workflow in .github/workflows/security-supply-chain.yml runs cargo-audit, OSV-Scanner, and generates SPDX JSON and CycloneDX JSON SBOM artifacts. OSV-Scanner is currently non-blocking while its baseline is established. Review every advisory and generated SBOM; scanner coverage is ecosystem- and lockfile-dependent.
+
+Local tools:
 
 ```bash
-cargo build --release
-./target/release/zerofactor scan --path /path/to/repository
+cargo install cargo-audit --locked
+cargo audit
+osv-scanner scan source -r .
+syft dir:. -o spdx-json=sbom.spdx.json
+syft dir:. -o cyclonedx-json=sbom.cdx.json
 ```
 
-The scan target must be a local directory. Only scan repositories you own or are explicitly authorized to assess.
+## Isolated execution
 
-## What the first engine checks
+sandbox/run-isolated.sh requires Docker with gVisor runsc registered and refuses default-runtime fallback. It enforces no network, read-only target/root filesystem, dropped capabilities, seccomp, no-new-privileges, unprivileged execution, and resource limits. It requires an explicit, unexpired scope file and prebuilt image. Use only disposable targets with written authorization. This launcher is not yet a production multi-tenant sandbox; validate isolation independently and prefer a dedicated VM/host.
 
-- Bounded local file inventory and classification of top-level components (source, tests, backend, frontend, infrastructure, tooling, configuration, documentation); skips common generated and vendored directories, symlinks, files over 1 MiB, and scans beyond the 20,000-file cap.
-- Direct dependency declaration discovery for common Cargo, npm, Python requirements/Pipfile and Go manifests. This is inventory only, not a vulnerability/advisory audit or complete transitive dependency graph.
-- Environment-file presence and possible hard-coded secret patterns; values are redacted in reports.
-- Selected source-level heuristics for unsafe C string APIs, shell execution, dynamic evaluation, HTML insertion and disabled TLS verification.
-- Evidence with stable IDs, relative paths, line numbers, review status, redacted evidence and remediation guidance.
-- JSON and Markdown reports, experimental weighted ZFI and explicit test coverage.
+## What the original static engine checks
 
-## Interpreting ZFI and coverage
+- Bounded local file inventory and top-level component classification.
+- Partial direct dependency declaration discovery for Cargo, npm, Python and Go.
+- Environment-file presence and possible hard-coded secret patterns, with redaction.
+- Selected source-level heuristics for unsafe APIs and validation patterns.
+- Findings with relative paths, line numbers, review status and recommendations.
+- JSON and Markdown reports, experimental weighted ZFI and explicit coverage.
 
-The experimental ZFI is calculated from explicitly recorded weighted check failures over tested check weight. Coverage is tested weight over all declared check weight. The ZFI is reported as unavailable until a confirmed source-level failure is recorded. Heuristic matches are marked `needs_review` and do not automatically count as confirmed failures. Untested dependency advisory, runtime and sandbox checks reduce coverage; they must never be interpreted as passing.
+## Evidence interpretation
 
-ZFI is not a probability, certification, compliance attestation, or proof of security. A low score with low coverage is not evidence that a system is safe.
+Dependency states must be distinguished: declared, resolved, advisory-matched, reachability-assessed, and exploitability-demonstrated. A CVE match is not proof of reachability or exploitation. Heuristic findings require human review.
 
-## Safety model
+ZFI is an experimental evidence indicator, not a probability, certification, compliance attestation, or proof of security. A clean report with low coverage does not establish safety.
 
-- Explicit authorization and declared scope are mandatory for assessments.
-- Initial analyzers are local and read-only.
-- Potentially disruptive scenarios belong in isolated, disposable laboratories.
-- Findings distinguish observed source patterns from confirmed runtime impact.
-- ZEROFACTOR never modifies the assessed system or its security policy automatically.
-
-## Architecture and governance
+## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Security model](docs/SECURITY_MODEL.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Dependency intelligence and SBOM](docs/DEPENDENCY_INTELLIGENCE.md)
+- [Exploitability and impact methodology](docs/EXPLOITABILITY_AND_IMPACT.md)
+- [Sandbox instructions](sandbox/README.md)
+- [Dashboard instructions](docs/DASHBOARD.md)
+
+Only assess systems you own or are explicitly authorized to test. ZEROFACTOR never automatically modifies the assessed system.
 
 ## License
 
