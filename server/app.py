@@ -1,7 +1,8 @@
 """Local-first ZEROFACTOR dashboard API: SQLite, scrypt passwords, opaque sessions and project-scoped RBAC.
 Bind to loopback only. This is a hardened development foundation, not a public multi-tenant deployment recipe.
 """
-import base64, hashlib, hmac, json, os, secrets, sqlite3, time\nfrom pathlib import Path
+import base64, hashlib, hmac, json, os, secrets, sqlite3, time
+from pathlib import Path
 from http.cookies import SimpleCookie
 from urllib.parse import unquote
 from wsgiref.simple_server import make_server
