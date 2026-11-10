@@ -1,0 +1,8 @@
+{
+  "module": "RATE",
+  "case_id": "rate-passive-observation",
+  "observations": [
+    {"elapsed_ms": 0, "status": 200, "retry_after_present": false},
+    {"elapsed_ms": 1200, "status": 200, "retry_after_present": false}
+  ]
+}
