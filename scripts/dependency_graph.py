@@ -43,14 +43,14 @@ def python_toml(data,kind):
     for p in data.get("package",[]):
         if not isinstance(p,dict) or not p.get("name") or not p.get("version"): continue
         raw=p.get("dependencies",{}); deps=list(raw.keys()) if isinstance(raw,dict) else [x.get("name") for x in raw if isinstance(x,dict) and x.get("name")] if isinstance(raw,list) else []
-        out.append(dict(ecosystem="PyPI",name=p["name"],version=str(p["version"]),source=kind,dependencies=sorted(set(str(x) for x in deps))))
+        out.append(dict(ecosystem="PyPI",name=p["name"],version=str(p["version"]),source=kind,dependencies=sorted(set(str(x) for x in deps)),graph_complete=False))
     return out
 
 def pipfile(data):
     out=[]
     for group in ("default","develop"):
         for name,p in (data.get(group) or {}).items():
-            if isinstance(p,dict) and p.get("version"): out.append(dict(ecosystem="PyPI",name=name,version=str(p["version"]).lstrip("="),source="Pipfile.lock",dependencies=[]))
+            if isinstance(p,dict) and p.get("version"): out.append(dict(ecosystem="PyPI",name=name,version=str(p["version"]).lstrip("="),source="Pipfile.lock",dependencies=[],graph_complete=False))
     return out
 
 def go_sum(path):
