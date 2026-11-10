@@ -12,7 +12,7 @@ class LockGraphTests(unittest.TestCase):
   d=self.run_script({"Cargo.lock":'version = 3\n[[package]]\nname = "app"\nversion = "1.0.0"\ndependencies = ["serde 1.0.1"]\n[[package]]\nname = "serde"\nversion = "1.0.1"\n'})
   self.assertEqual(next(x for x in d["packages"] if x["name"]=="app")["dependencies"],["serde@1.0.1"])
  def test_cargo_bare_lock_reference_when_unambiguous(self):
-  lock='version = 4\\n[[package]]\\nname = "app"\\nversion = "1.0.0"\\ndependencies = ["serde"]\\n[[package]]\\nname = "serde"\\nversion = "1.0.0"\\n'
+  lock='version = 4\n[[package]]\nname = "app"\nversion = "1.0.0"\ndependencies = ["serde"]\n[[package]]\nname = "serde"\nversion = "1.0.0"\n'
   d=self.run_script({"Cargo.lock":lock})
   self.assertEqual(next(x for x in d["packages"] if x["name"]=="app")["dependencies"],["serde@1.0.0"])
   self.assertTrue(d["graph_complete"])
