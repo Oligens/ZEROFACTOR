@@ -18,13 +18,14 @@ class RustEvidenceEndToEndTests(unittest.TestCase):
             evidence_paths = []
             for module in MODULES:
                 output = temp / f"{module.lower()}.json"
-                subprocess.run([
+                completed = subprocess.run([
                     "python3", str(ROOT / "scripts" / "run_controlled_module.py"),
                     "--module", module, "--scope", str(SCOPE),
                     "--fixture", str(FIXTURES / f"{module.lower()}.json"),
                     "--output", str(output),
                 ], cwd=ROOT, check=False, capture_output=True, text=True)
-                self.assertIn(0 if module != "RATE" else 2, (0, 1, 2))
+                self.assertEqual(completed.returncode, 2 if module == "RATE" else 0,
+                                 msg=f"{module}: {completed.stderr or completed.stdout}")
                 self.assertTrue(output.is_file(), msg=f"{module} did not emit an evidence envelope")
                 evidence_paths.append(output)
 
