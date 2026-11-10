@@ -51,7 +51,7 @@ pub fn json(a: &Assessment) -> String {
         q(&f.id), q(&f.category), q(f.severity.as_str()), q(f.status.as_str()), q(&f.title), q(&f.path.display().to_string()),
         f.line.map(|n| n.to_string()).unwrap_or_else(|| "null".into()), q(&f.evidence), q(&f.recommendation)
     )).collect::<Vec<_>>().join(",");
-    let components = a.components.iter().map(|c| format!("{{\\"path\\":{},\\"kind\\":{}}}", q(&c.path.display().to_string()), q(&c.kind))).collect::<Vec<_>>().join(",");
+    let components = a.components.iter().map(|c| format!("{{\"path\":{},\"kind\":{}}}", q(&c.path.display().to_string()), q(&c.kind))).collect::<Vec<_>>().join(",");
     let dependencies = a.dependencies.iter().map(|d| format!(
         "{{\"ecosystem\":{},\"name\":{},\"version_spec\":{},\"manifest\":{}}}",
         q(&d.ecosystem), q(&d.name), q(&d.version_spec), q(&d.manifest.display().to_string())
