@@ -11,7 +11,7 @@ def row(eco,name,version,source,deps=None,unresolved=None,**extra):
         unresolved_dependencies=unresolved,graph_complete=not unresolved,**extra)
 
 def version_tuple(value):
-    m=re.match(r"^v?(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?",str(value).strip())
+    m=re.match(r"^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?",str(value).strip())
     return tuple(int(x or 0) for x in m.groups()) if m else None
 
 def version_satisfies(spec, locked):
