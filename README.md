@@ -47,7 +47,7 @@ Open `http://127.0.0.1:8765/`. Accounts, project memberships, assessment history
 
 ```bash
 python3 -m unittest discover -s scripts -p 'test_*.py'
-python3 scripts/controlled_tests.py --scope scripts/http-scope.json --checks security_headers cookie_flags --output reports/http-checks.json
+cp scripts/http-scope.example.json scripts/http-scope.json\n# Edit scripts/http-scope.json with written authorization and the exact HTTPS host.\npython3 scripts/controlled_tests.py --scope scripts/http-scope.json --checks security_headers cookie_flags --output reports/http-checks.json
 ```
 The HTTP runner requires an unexpired authorization scope, exact HTTPS host allowlisting and uses GET-only passive checks. See [controlled testing](docs/CONTROLLED_TESTING.md).
 
