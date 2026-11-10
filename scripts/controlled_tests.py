@@ -41,15 +41,15 @@ def run(scope_path, output, selected):
             low=value.lower()
             if value and ("secure" not in low or "httponly" not in low or "samesite" not in low): cookie_issues.append("cookie_missing_recommended_flags")
     checks=[]
-    if "security_headers" in selected: checks.append({"test_id":"HTTP-SEC-HEADERS","result":"fail" if missing else "pass","observed":{"missing_headers":missing},"impact":[{"dimension":"exposure","value":len(missing),"unit":"missing_security_headers","method":"response_header_presence","confidence":"high"}]})
-    if "cookie_flags" in selected: checks.append({"test_id":"HTTP-COOKIE-FLAGS","result":"fail" if cookie_issues else "pass","observed":{"issues":cookie_issues},"impact":[{"dimension":"session_hardening","value":len(cookie_issues),"unit":"cookies_without_recommended_flags","method":"set_cookie_header_review","confidence":"medium"}]})
+    if "security_headers" in selected: checks.append({"test_id":"HTTP-SEC-HEADERS","result":"fail" if missing else "pass","observed":{"missing_headers":missing},"impact":[{"dimension":"exposure","value":len(missing),"unit":"missing_security_headers","method":"response_header_presence","confidence":0.95}]})
+    if "cookie_flags" in selected: checks.append({"test_id":"HTTP-COOKIE-FLAGS","result":"fail" if cookie_issues else "pass","observed":{"issues":cookie_issues},"impact":[{"dimension":"session_hardening","value":len(cookie_issues),"unit":"cookies_without_recommended_flags","method":"set_cookie_header_review","confidence":0.7}]})
     if "https_target_only" in selected: checks.append({"test_id":"HTTP-HTTPS-TARGET","result":"pass","observed":{"scheme":"https","status":status},"impact":[]})
     artifact_dir=pathlib.Path(output).with_suffix("").parent/"evidence-artifacts"; artifact_dir.mkdir(parents=True,exist_ok=True)
     artifact=artifact_dir/(uuid.uuid4().hex+".response"); artifact.write_bytes(body); digest=hashlib.sha256(body).hexdigest()
     target_fingerprint=hashlib.sha256((parsed.scheme+"://"+parsed.netloc).encode()).hexdigest()
     records=[]
     for c in checks:
-        records.append({"evidence_id":str(uuid.uuid4()),"assessment_id":scope.get("assessment_id","controlled-http"),"test_id":c["test_id"],"classification":"reproduced" if c["result"]=="fail" else "static","scope":{"authorization_id":scope["authorization_id"],"target_fingerprint":target_fingerprint,"expires_at":scope["expires_at"]},"observed_at":dt.datetime.now(dt.timezone.utc).isoformat(),"result":c["result"],"finding_id":scope.get("finding_ids",{}).get(c["test_id"]),"impact":c["impact"],"observed":c["observed"],"integrity":{"sha256":digest,"artifact_uri":str(artifact)}})
+        records.append({"evidence_id":str(uuid.uuid4()),"assessment_id":scope.get("assessment_id","controlled-http"),"test_id":c["test_id"],"classification":"reproduced" if c["result"]=="fail" else "static","scope":{"authorization_id":scope["authorization_id"],"target_fingerprint":target_fingerprint,"expires_at":scope["expires_at"]},"observed_at":dt.datetime.now(dt.timezone.utc).isoformat(),"result":c["result"],"finding_id":scope.get("finding_ids",{}).get(c["test_id"]),"impact":c["impact"],"observed":json.dumps(c["observed"],sort_keys=True),"integrity":{"sha256":digest,"artifact_uri":str(artifact)}})
     result={"target_origin":parsed.scheme+"://"+parsed.netloc,"http_status":status,"duration_ms":elapsed_ms,"checks":checks,"evidence_records":records,"safety":{"methods":["GET"],"redirects_followed":False,"body_limit_bytes":MAX_BODY,"no_exploit_payloads":True}}
     pathlib.Path(output).write_text(json.dumps(result,indent=2)+"\n")
     print(f"checks={len(checks)} failed={sum(x['result']=='fail' for x in checks)} evidence={len(records)}")
