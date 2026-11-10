@@ -43,3 +43,12 @@ Current policy enforcement is conditional in CI: it runs only when trusted `sour
 - CVE presence is not evidence that a vulnerable function is reachable.
 - A clean result with missing lockfiles or incomplete graph coverage is not a clean bill of health.
 - Review scanner exit codes, graph completeness, SBOM and advisory artifacts together.
+
+
+## Phase 1 — mandatory reliability gate
+
+CI now fetches the OSV snapshot's upstream HTTPS `Last-Modified` header using `scripts/fetch_osv_metadata.py`; it does not substitute scan time or advisory timestamps. The mandatory CVE policy runs on every supply-chain workflow execution, and missing/stale metadata fails closed.
+
+`scripts/assessment_gate.py` validates the dependency graph, policy result, scanner execution status, SPDX and CycloneDX documents, and basic cross-format package identity consistency. It blocks an assessment when the graph is incomplete, inventory-only, or has parser errors. OSV-Scanner exit code 1 is treated as findings reported (not scanner failure); exit codes above 1 are operational failures.
+
+This deliberately means that supported-but-incomplete lockfile coverage (including inventory-only Pipfile.lock, go.sum, or Gradle lockfiles) prevents a complete assessment. Yarn Berry, pnpm and Maven adapters remain follow-up work; ZEROFACTOR must not mislabel them as covered.
