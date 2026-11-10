@@ -30,6 +30,32 @@ python3 scripts/dependency_graph.py ../atibon --output reports/dependency-graph.
 
 Review `graph_complete` and `limitations`; do not assume a partial inventory is a complete graph.
 
+## Controlled evidence pipeline
+
+Run the offline evaluators using synthetic fixtures and a valid scope file. The example scope is intentionally unauthorized and must remain `authorized: false` until replaced with genuine written authorization. The gVisor fixture adapter also requires the fixture ID in `fixture_ids` and a digest-pinned module image.
+
+```bash
+python3 scripts/controlled_modules.py --module AUTH --scope scripts/controlled-scope.json --fixture fixtures/controlled/auth.json --output reports/auth.json
+```
+
+Run the Rust scanner and import one or more synthetic results:
+
+```bash
+cargo run -- scan --path ../atibon \
+  --controlled-result reports/auth.json \
+  --controlled-result reports/input.json \
+  --assessment-id assessment-2026-001 \
+  --format json --out reports/assessment.json
+```
+
+Rust verifies the complete result artifact SHA-256, records each item as `Simulated`, and labels findings from failed fixtures `[SIMULATION]` / `NeedsReview`. It rejects mismatched checks, non-zero safety assertions and duplicate evidence IDs. It does not promote synthetic observations to reproduced vulnerabilities.
+
+The five evaluators make zero network connections and do not read target files. RATE can return `inconclusive`. See [controlled testing](docs/CONTROLLED_TESTING.md), [module contracts](docs/CONTROLLED_MODULES.md) and [synthetic fixtures](fixtures/controlled/README.md).
+
+## gVisor and network isolation
+
+`sandbox/run-controlled-fixture.sh` executes the offline evaluator in a digest-pinned gVisor container with `--network=none`, read-only input mounts, dropped capabilities and bounded resources. The dedicated VM host still requires real validation. See [VM setup](sandbox/VM_SETUP.md) and [VM egress policy](sandbox/EGRESS_POLICY.md). The smoke test is not sandbox-escape certification.
+
 ## Local dashboard API
 
 ```bash
@@ -38,34 +64,6 @@ python3 -m unittest discover -s server -p 'test_*.py'
 ```
 
 Open `http://127.0.0.1:8765/`. Accounts, project memberships, assessment history and roles are stored in SQLite. Roles are Owner, Analyst and Viewer. The API binds to loopback only and is not production-ready for public exposure.
-
-## Controlled checks
-
-Run the complete Python suite:
-
-```bash
-python3 -m unittest discover -s scripts -p 'test_*.py'
-```
-
-Copy the example scope and edit it only with written authorization:
-
-```bash
-cp scripts/controlled-scope.example.json scripts/controlled-scope.json
-```
-
-The example is intentionally unauthorized. Set `authorized` to `true` only after replacing the authorization ID and owner with valid written authorization details. Then run an offline evaluator:
-
-```bash
-python3 scripts/controlled_modules.py --module AUTH --scope scripts/controlled-scope.json --fixture fixtures/controlled/auth.json --output reports/auth.json
-```
-
-Supported offline modules: AUTH, INPUT, FILE, RATE and RECOVERY. They make zero network connections and read no target files. RATE's example is expected to return `inconclusive` because a small unthrottled sample cannot prove that rate limiting is absent. See [controlled testing](docs/CONTROLLED_TESTING.md), [module contracts](docs/CONTROLLED_MODULES.md) and [synthetic fixture examples](fixtures/controlled/README.md).
-
-The separate HTTP posture runner requires an unexpired authorization scope, exact HTTPS host allowlisting and GET-only passive checks. Do not run it against a system without written authorization.
-
-## Isolated execution
-
-`sandbox/run-isolated.sh` requires Docker with gVisor runsc registered and refuses default-runtime fallback. It applies network, filesystem, capability and resource controls. The manual GitHub workflow requires a dedicated self-hosted Linux runner labelled `gvisor`. **The host smoke test has not been run here and is not a sandbox escape certification.**
 
 ## Documentation
 
