@@ -48,6 +48,10 @@ def run(scope_path, output, connect=socket.create_connection, context_factory=ss
                     "cipher":cipher_name,
                     "certificate_verified":True,
                 }
+    except ssl.SSLError as exc:
+        # Certificate and protocol verification failures are negative TLS observations.
+        result="fail"
+        details={"hostname":host,"port":port,"failure_class":type(exc).__name__,"certificate_verified":False}
     except Exception as exc:
         # Do not serialize exception text: TLS/network exceptions can include target data.
         result="inconclusive"
