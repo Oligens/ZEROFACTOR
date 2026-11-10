@@ -134,7 +134,7 @@ fn parse_json_pair(line: &str) -> Option<(String, String)> {
     if valid_package_name(&name) { Some((name, version)) } else { None }
 }
 fn valid_package_name(s: &str) -> bool { !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '/')) }
-fn is_manifest(n: &str) -> bool { matches!(n, "Cargo.toml" | "package.json" | "requirements.txt" | "Pipfile" | "go.mod" | "pyproject.toml" | "Gemfile" | "composer.json" | "pom.xml" | "build.gradle") }
+fn is_manifest(n: &str) -> bool { matches!(n, "Cargo.toml" | "package.json" | "requirements.txt" | "Pipfile" | "go.mod") }
 fn is_sensitive_env_file(n: &str) -> bool { n == ".env" || n.starts_with(".env.") && n != ".env.example" && n != ".env.template" }
 fn looks_like_secret_assignment(l: &str) -> bool {
     let key = ["password", "passwd", "secret", "api_key", "apikey", "access_token", "private_key", "client_secret"];
