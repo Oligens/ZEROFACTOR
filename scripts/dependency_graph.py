@@ -10,6 +10,50 @@ def row(eco,name,version,source,deps=None,unresolved=None,**extra):
     return dict(ecosystem=eco,name=name,version=str(version),source=source,dependencies=deps or [],
         unresolved_dependencies=unresolved,graph_complete=not unresolved,**extra)
 
+def version_tuple(value):
+    m=re.match(r"^v?(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?",str(value).strip())
+    return tuple(int(x or 0) for x in m.groups()) if m else None
+
+def version_satisfies(spec, locked):
+    spec=str(spec or "").strip()
+    actual=version_tuple(locked)
+    if not spec or spec=="*":return True
+    if actual is None:return False
+    for clause in spec.split(","):
+        clause=clause.strip()
+        if not clause or clause=="*":continue
+        if clause.startswith("^") or clause.startswith("~"):
+            base=version_tuple(clause[1:])
+            if base is None or actual<base:return False
+            if clause.startswith("^"):
+                if base[0]>0:upper=(base[0]+1,0,0)
+                elif base[1]>0:upper=(0,base[1]+1,0)
+                else:upper=(0,0,base[2]+1)
+            else:upper=(base[0],base[1]+1,0)
+            if actual>=upper:return False
+        elif clause.startswith(">="):
+            bound=version_tuple(clause[2:])
+            if bound is None or actual<bound:return False
+        elif clause.startswith("<="):
+            bound=version_tuple(clause[2:])
+            if bound is None or actual>bound:return False
+        elif clause.startswith(">"):
+            bound=version_tuple(clause[1:])
+            if bound is None or actual<=bound:return False
+        elif clause.startswith("<"):
+            bound=version_tuple(clause[1:])
+            if bound is None or actual>=bound:return False
+        elif clause.startswith("==") or clause.startswith("="):
+            bound=version_tuple(clause.lstrip("="))
+            if bound is None or actual!=bound:return False
+        elif clause.startswith("!="):
+            bound=version_tuple(clause[2:])
+            if bound is None or actual==bound:return False
+        else:
+            bound=version_tuple(clause)
+            if bound is None or actual!=bound:return False
+    return True
+
 def resolve_named(raw, packages, ecosystem):
     name=str(raw).strip()
     candidates=packages.get(name.lower().replace("_","-"),[])
@@ -114,7 +158,7 @@ def yarn_classic(path):
             hits=versions.get(dep.lower().replace("_","-"),[])
             if len(hits)==1 and hits[0].get("version"):
                 locked=str(hits[0]["version"]);spec=str(constraint or "").strip()
-                if spec in ("", "*", locked, "="+locked, "=="+locked):deps.append(hits[0]["name"]+"@"+locked)
+                if version_satisfies(spec,locked):deps.append(hits[0]["name"]+"@"+locked)
                 else:unresolved.append(dep+" ("+spec+"; locked "+locked+")")
             else:unresolved.append(dep)
         out.append(row("npm",x["name"],x["version"],x["source"],sorted(set(deps)),unresolved))
@@ -138,7 +182,7 @@ def python_toml(data,kind):
             hit=resolve_named(dep,index,"PyPI")
             if hit:
                 locked=str(hit["version"]);spec=str(constraint or "").strip()
-                if spec in ("","*",locked,"="+locked,"=="+locked):deps.append(hit["name"]+"@"+locked)
+                if version_satisfies(spec,locked):deps.append(hit["name"]+"@"+locked)
                 else:unresolved.append(str(dep)+" ("+spec+"; locked "+locked+")")
             else:unresolved.append(str(dep))
         out.append(row("PyPI",p["name"],p["version"],kind,sorted(set(deps)),unresolved))
