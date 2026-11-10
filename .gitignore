@@ -1,0 +1,10 @@
+/target/
+**/*.rs.bk
+.env
+.env.*
+!.env.example
+*.log
+reports/
+evidence/private/
+.DS_Store
+Thumbs.db

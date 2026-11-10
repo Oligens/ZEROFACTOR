@@ -1,0 +1,11 @@
+[workspace]
+members = ["core-rust"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "UNLICENSED"
+rust-version = "1.75"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
