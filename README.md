@@ -29,10 +29,16 @@ cargo build --release
 
 The scan target must be a local directory. Only scan repositories you own or are explicitly authorized to assess.
 
+## Current implementation boundary
+
+**The current release is an inventory and preliminary static-inspection tool only.** It is not a CVE scanner, a complete software-composition analysis platform, a runtime penetration tester, or a sandbox. A direct dependency listed in a manifest is an inventory observation, not proof that the package is installed, reachable, exploitable, or vulnerable.
+
+See [Implementation status](docs/IMPLEMENTATION_STATUS.md) for the capability matrix and deferred work.
+
 ## What the first engine checks
 
 - Bounded local file inventory and classification of top-level components (source, tests, backend, frontend, infrastructure, tooling, configuration, documentation); skips common generated and vendored directories, symlinks, files over 1 MiB, and scans beyond the 20,000-file cap.
-- Direct dependency declaration discovery for common Cargo, npm, Python requirements/Pipfile and Go manifests. This is inventory only, not a vulnerability/advisory audit or complete transitive dependency graph.
+- Direct dependency declaration discovery for common Cargo, npm, Python requirements/Pipfile and Go manifests. This is inventory only: no lockfile-complete graph, transitive resolution, package reachability analysis, or CVE/advisory lookup.
 - Environment-file presence and possible hard-coded secret patterns; values are redacted in reports.
 - Selected source-level heuristics for unsafe C string APIs, shell execution, dynamic evaluation, HTML insertion and disabled TLS verification.
 - Evidence with stable IDs, relative paths, line numbers, review status, redacted evidence and remediation guidance.
