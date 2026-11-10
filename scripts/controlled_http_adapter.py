@@ -3,7 +3,7 @@
 
 No DNS resolution, credentials, cookies, request bodies, redirects, writes or
 response-body persistence. Destination IPs must be explicit in the signed-off
-scope and separately allowed by the VM firewall.
+scope and separately allowed by the verified VM firewall.
 """
 import argparse
 import datetime as dt
@@ -14,6 +14,7 @@ import json
 import pathlib
 import socket
 import ssl
+import subprocess
 import uuid
 
 from validate_scope import validate_scope
@@ -33,6 +34,16 @@ class PinnedHTTPSConnection(http.client.HTTPSConnection):
         self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
 
 
+def _verify_egress_firewall(scope_path):
+    verifier = pathlib.Path(__file__).resolve().parent.parent / "sandbox" / "verify-egress-policy.sh"
+    completed = subprocess.run(
+        ["bash", str(verifier), str(scope_path)],
+        capture_output=True, text=True, timeout=10, check=False,
+    )
+    if completed.returncode != 0:
+        raise ValueError("VM egress firewall verification failed; live network operation blocked")
+
+
 def _route_result(module, route, status, retry_after, body_limit_hit):
     if body_limit_hit:
         return "inconclusive", "response_body_limit_exceeded"
@@ -41,13 +52,12 @@ def _route_result(module, route, status, retry_after, body_limit_hit):
     if module == "RATE":
         return ("pass", "rate_limit_signal_observed") if status == 429 or retry_after else (
             "inconclusive", "single_passive_observation_cannot_establish_rate_limit_absence")
-    expected = route["expected_status"]
-    if status in expected:
+    if status in route["expected_status"]:
         return "pass", "response_matches_declared_route_policy"
     return "fail", "response_status_outside_declared_route_policy"
 
 
-def observe(module, scope_path, output_path):
+def observe(module, scope_path, output_path, firewall_check=None):
     scope = json.loads(pathlib.Path(scope_path).read_text(encoding="utf-8"))
     validated = validate_scope(scope)
     if not validated["live_network"]:
@@ -62,6 +72,13 @@ def observe(module, scope_path, output_path):
     if len(routes) > validated["request_budget"] or len(routes) > 12:
         raise ValueError("route count exceeds the authorized request budget")
 
+    # This check is mandatory for the CLI. Tests inject a verifier stub; production
+    # callers cannot bypass it through command-line options.
+    if firewall_check is None:
+        _verify_egress_firewall(scope_path)
+    else:
+        firewall_check(scope_path)
+
     hostname = validated["target_host"]
     destination_ip = validated["allowed_destination_ips"][0]
     observed_at = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -69,7 +86,6 @@ def observe(module, scope_path, output_path):
     checks, records = [], []
 
     for route in routes:
-        # Re-check expiry before every connection; route list is sequential.
         validated = validate_scope(scope)
         method, path = route["method"], route["path"]
         status = None
@@ -80,6 +96,7 @@ def observe(module, scope_path, output_path):
         content_length = None
         content_type = None
         body_limit_hit = False
+        conn = None
         try:
             conn = PinnedHTTPSConnection(hostname, destination_ip, validated["timeout_seconds"])
             conn.request(method, path, body=None, headers={
@@ -96,53 +113,38 @@ def observe(module, scope_path, output_path):
             content_length = int(raw_length) if raw_length and raw_length.isdigit() else None
             content_type = (response.getheader("Content-Type") or "")[:128] or None
             if method == "GET":
-                body = response.read(min(route.get("max_response_bytes", MAX_BODY_BYTES), MAX_BODY_BYTES) + 1)
                 body_limit = min(route.get("max_response_bytes", MAX_BODY_BYTES), MAX_BODY_BYTES)
+                body = response.read(body_limit + 1)
                 body_limit_hit = len(body) > body_limit
                 if not body_limit_hit:
                     body_bytes = len(body)
                     body_digest = hashlib.sha256(body).hexdigest()
             response.close()
-            conn.close()
         except (OSError, ssl.SSLError, http.client.HTTPException, TimeoutError):
             status = None
+        finally:
+            if conn is not None:
+                conn.close()
 
         result, reason = _route_result(module, route, status, retry_after, body_limit_hit)
         check = {
-            "case_id": route["id"],
-            "result": result,
-            "reason": reason,
-            "status_code": status,
-            "method": method,
-            "body_bytes": body_bytes,
-            "body_sha256": body_digest,
-            "retry_after_present": retry_after,
-            "header_names": header_names,
-            "content_length": content_length,
+            "case_id": route["id"], "result": result, "reason": reason,
+            "status_code": status, "method": method, "body_bytes": body_bytes,
+            "body_sha256": body_digest, "retry_after_present": retry_after,
+            "header_names": header_names, "content_length": content_length,
             "content_type": content_type,
         }
         checks.append(check)
         records.append({
-            "evidence_id": str(uuid.uuid4()),
-            "module": module,
-            "case_id": route["id"],
-            "classification": "controlled_observation",
-            "result": result,
-            "reason": reason,
+            "evidence_id": str(uuid.uuid4()), "module": module, "case_id": route["id"],
+            "classification": "controlled_observation", "result": result, "reason": reason,
             "authorization_id": validated["authorization_id"],
             "assessment_id": validated["assessment_id"],
-            "target_fingerprint": target_fingerprint,
-            "expires_at": validated["expires_at"],
-            "observed_at": observed_at,
-            "route_id": route["id"],
-            "method": method,
-            "status_code": status,
-            "body_bytes": body_bytes,
-            "body_sha256": body_digest,
-            "retry_after_present": retry_after,
-            "header_names": header_names,
-            "content_length": content_length,
-            "content_type": content_type,
+            "target_fingerprint": target_fingerprint, "expires_at": validated["expires_at"],
+            "observed_at": observed_at, "route_id": route["id"], "method": method,
+            "status_code": status, "body_bytes": body_bytes, "body_sha256": body_digest,
+            "retry_after_present": retry_after, "header_names": header_names,
+            "content_length": content_length, "content_type": content_type,
         })
 
     if any(check["result"] == "fail" for check in checks):
@@ -152,26 +154,15 @@ def observe(module, scope_path, output_path):
     else:
         overall = "pass"
     result = {
-        "schema_version": 1,
-        "module": module,
-        "case_id": validated["assessment_id"],
-        "assessment_id": validated["assessment_id"],
-        "authorization_id": validated["authorization_id"],
-        "expires_at": validated["expires_at"],
-        "target_fingerprint": target_fingerprint,
-        "result": overall,
-        "evidence_kind": "controlled_observation",
-        "observed_at": observed_at,
-        "checks": checks,
-        "evidence_records": records,
+        "schema_version": 1, "module": module, "case_id": validated["assessment_id"],
+        "assessment_id": validated["assessment_id"], "authorization_id": validated["authorization_id"],
+        "expires_at": validated["expires_at"], "target_fingerprint": target_fingerprint,
+        "result": overall, "evidence_kind": "controlled_observation", "observed_at": observed_at,
+        "checks": checks, "evidence_records": records,
         "safety": {
-            "network_connections": len(records),
-            "target_files_read": 0,
-            "target_files_written": 0,
-            "credentials_used": 0,
-            "redirects_followed": 0,
-            "response_body_bytes_persisted": 0,
-            "maximum_response_bytes": MAX_BODY_BYTES,
+            "network_connections": len(records), "target_files_read": 0,
+            "target_files_written": 0, "credentials_used": 0, "redirects_followed": 0,
+            "response_body_bytes_persisted": 0, "maximum_response_bytes": MAX_BODY_BYTES,
             "concurrency": 1,
         },
         "limitations": [
