@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          "$(go env GOPATH)/bin/osv-scanner" scan source -r . --format json > osv-results.json
+          "$(go env GOPATH)/bin/osv-scanner" scan source -r . --format json --all-packages > osv-results.json
           status=$?
           set -e
           echo "$status" > osv-scanner.exit-code
