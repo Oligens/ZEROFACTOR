@@ -110,9 +110,12 @@ def yarn_classic(path):
     out=[]
     for x in entries:
         deps=[];unresolved=[]
-        for dep,_constraint in x["dependencies"]:
+        for dep,constraint in x["dependencies"]:
             hits=versions.get(dep.lower().replace("_","-"),[])
-            if len(hits)==1 and hits[0].get("version"):deps.append(hits[0]["name"]+"@"+hits[0]["version"])
+            if len(hits)==1 and hits[0].get("version"):
+                locked=str(hits[0]["version"]);spec=str(constraint or "").strip()
+                if spec in ("", "*", locked, "="+locked, "=="+locked):deps.append(hits[0]["name"]+"@"+locked)
+                else:unresolved.append(dep+" ("+spec+"; locked "+locked+")")
             else:unresolved.append(dep)
         out.append(row("npm",x["name"],x["version"],x["source"],sorted(set(deps)),unresolved))
     return out
@@ -129,11 +132,14 @@ def python_toml(data,kind):
             deps=[];unresolved=["dependency_section_missing"]
             out.append(row("PyPI",p["name"],p["version"],kind,deps,unresolved));continue
         rawdeps=p.get("dependencies",{})
-        names=list(rawdeps.keys()) if isinstance(rawdeps,dict) else [x.get("name") for x in rawdeps if isinstance(x,dict) and x.get("name")] if isinstance(rawdeps,list) else []
+        pairs=list(rawdeps.items()) if isinstance(rawdeps,dict) else [(x.get("name"),x.get("version") or x.get("specifier") or "") for x in rawdeps if isinstance(x,dict) and x.get("name")] if isinstance(rawdeps,list) else []
         deps=[];unresolved=[]
-        for dep in names:
+        for dep,constraint in pairs:
             hit=resolve_named(dep,index,"PyPI")
-            if hit:deps.append(hit["name"]+"@"+str(hit["version"]))
+            if hit:
+                locked=str(hit["version"]);spec=str(constraint or "").strip()
+                if spec in ("","*",locked,"="+locked,"=="+locked):deps.append(hit["name"]+"@"+locked)
+                else:unresolved.append(str(dep)+" ("+spec+"; locked "+locked+")")
             else:unresolved.append(str(dep))
         out.append(row("PyPI",p["name"],p["version"],kind,sorted(set(deps)),unresolved))
     return out
