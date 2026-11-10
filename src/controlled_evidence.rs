@@ -146,12 +146,14 @@ mod tests {
     }
     fn envelope(result: &str) -> String {
         format!(r#"{{"schema_version":1,"module":"AUTH","case_id":"auth-case","result":"{result}",
-          "evidence_kind":"synthetic_fixture",
+          "evidence_kind":"synthetic_fixture","authorization_id":"written-auth-123",
+          "target_fingerprint":"0000000000000000000000000000000000000000000000000000000000000000",
+          "authorization_expires_at":"2099-01-01T00:00:00Z",
           "safety":{{"network_connections":0,"target_files_read":0,"target_files_written":0,"credentials_used":0}},
           "checks":[{{"case_id":"private-route","result":"{result}","reason":"fixture_reason"}}],
           "evidence_records":[{{"evidence_id":"evidence-123456","module":"AUTH","case_id":"private-route",
           "classification":"synthetic_fixture","result":"{result}","reason":"fixture_reason",
-          "authorization_id":"written-auth-123","target_fingerprint":"0123456789abcdef",
+          "authorization_id":"written-auth-123","target_fingerprint":"0000000000000000000000000000000000000000000000000000000000000000",
           "authorization_expires_at":"2099-01-01T00:00:00Z","observed_at":"2026-11-10T00:00:00Z"}}]}}"#)
     }
     #[test]
