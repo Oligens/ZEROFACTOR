@@ -3,17 +3,17 @@
 ## Phase 1 — Repository Intelligence MVP
 - [x] Rust CLI and library
 - [x] Bounded local read-only inventory
-- [x] Common dependency manifest discovery
+- [x] Common dependency manifest discovery and direct declaration inventory
 - [x] Sensitive configuration and secret-shaped pattern detection with redaction
 - [x] Selected validation / unsafe API heuristics
 - [x] Findings, JSON and Markdown reports
 - [x] Experimental ZFI and explicit coverage
-- [x] Unit and integration tests
+- [x] Unit and integration test scaffolding
 
 ## Phase 2 — Deep repository intelligence
 - [ ] Git tracked-file and history analysis (without exposing secret values)
 - [ ] Language-aware parsing / AST analysis
-- [ ] Dependency lockfile parsing and reproducible SBOM
+- [ ] Complete lockfile parsing and reproducible SBOM
 - [ ] Advisory ingestion with source, timestamp and version provenance
 - [ ] Framework-specific configuration analyzers
 - [ ] SARIF export
