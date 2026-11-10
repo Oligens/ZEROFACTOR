@@ -50,6 +50,13 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
     if !MODULES.contains(&module.as_str()) { return Err(format!("unsupported controlled module: {module}")); }
     let case_id = required_string(&value, "case_id")?.to_string();
     if !valid_case_id(&case_id) { return Err("invalid controlled case_id".into()); }
+    let envelope_auth = required_string(&value, "authorization_id")?;
+    let envelope_fingerprint = required_string(&value, "target_fingerprint")?;
+    let envelope_expiry = required_string(&value, "authorization_expires_at")?;
+    if envelope_fingerprint.len() != 64 || !envelope_fingerprint.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("target_fingerprint must be a SHA-256 hex digest".into());
+    }
+    let envelope_result = result_value(&value)?;
     if required_string(&value, "evidence_kind")? != "synthetic_fixture" {
         return Err("controlled importer accepts synthetic_fixture results only".into());
     }
@@ -64,8 +71,15 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
     if records.is_empty() || records.len() != checks.len() || records.len() > 12 {
         return Err("controlled result must contain 1–12 matching checks and evidence records".into());
     }
+    let expected_overall = if checks.iter().any(|c| c.get("result").and_then(Value::as_str) == Some("fail")) {
+        EvidenceResult::Fail
+    } else if checks.iter().any(|c| c.get("result").and_then(Value::as_str) == Some("inconclusive")) {
+        EvidenceResult::Inconclusive
+    } else { EvidenceResult::Pass };
+    if envelope_result != expected_overall { return Err("result envelope does not match its checks".into()); }
     let mut findings = Vec::new();
     let mut inconclusive = 0usize;
+    let mut seen_cases = std::collections::BTreeSet::new();
     let mut staged_index = index.clone();
     for (position, raw) in records.iter().enumerate() {
         if required_string(raw, "module")? != module || required_string(raw, "classification")? != "synthetic_fixture" {
@@ -77,8 +91,12 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
         if staged_index.records.iter().any(|existing| existing.evidence_id == evidence_id) {
             return Err(format!("duplicate evidence_id: {evidence_id}"));
         }
+        if !seen_cases.insert(record_case.clone()) { return Err("duplicate case_id in controlled result".into()); }
         let authorization_id = required_string(raw, "authorization_id")?.to_string();
         let target_fingerprint = required_string(raw, "target_fingerprint")?.to_string();
+        if authorization_id != envelope_auth || target_fingerprint != envelope_fingerprint {
+            return Err("evidence record scope does not match result envelope".into());
+        }
         let observed_at = required_string(raw, "observed_at")?.to_string();
         let expires_at = required_string(raw, "authorization_expires_at")?.to_string();
         let result = result_value(raw)?;
@@ -95,9 +113,6 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
             integrity: EvidenceIntegrity { sha256: digest.clone(), artifact_uri: Some(artifact.to_string_lossy().into_owned()) },
         };
         record.verify()?;
-        if staged_index.records.iter().any(|existing| existing.evidence_id == record.evidence_id) {
-            return Err(format!("duplicate evidence_id: {}", record.evidence_id));
-        }
         staged_index.ingest(record)?;
         match result {
             EvidenceResult::Fail => {
