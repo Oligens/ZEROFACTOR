@@ -83,7 +83,7 @@ def main():
     parser.add_argument("--advisories", required=True)
     parser.add_argument("--policy-result", required=True)
     parser.add_argument("--osv-exit-code", required=True, type=int)
-    parser.add_argument("--rustsec-exit-code", required=True, type=int)\n    parser.add_argument("--rustsec-exit-code", required=True, type=int)
+    parser.add_argument("--rustsec-exit-code", required=True, type=int)
     parser.add_argument("--spdx", required=True)
     parser.add_argument("--cyclonedx", required=True)
     parser.add_argument("--output", default="assessment-gate.json")
