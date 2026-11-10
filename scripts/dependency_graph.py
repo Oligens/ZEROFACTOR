@@ -216,7 +216,7 @@ def composer(data):
             hits=index.get(name.lower(),[])
             if len(hits)==1 and version_satisfies(constraint,hits[0]["version"]):deps.append(hits[0]["name"]+"@"+str(hits[0]["version"]))
             else:unresolved.append(name+" ("+str(constraint)+")")
-        out.append(row("Packagist",p["name"],p["version"],"composer.lock",sorted(set(deps)),unresolved,dist=p.get("dist",{}).get("reference")))
+        out.append(row("Packagist",p["name"],p["version"],"composer.lock",sorted(set(deps)),unresolved,dist=(p.get("dist") or {}).get("reference")))
     return out
 
 def gemfile_lock(path):
