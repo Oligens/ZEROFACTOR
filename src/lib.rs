@@ -4,5 +4,5 @@ pub mod model;
 pub mod report;
 pub mod scanner;
 
-pub use model::{Assessment, Check, Dependency, Finding, FindingStatus, Severity};
+pub use model::{Assessment, Check, Component, Dependency, Finding, FindingStatus, Severity};
 pub use scanner::{scan_repository, ScanOptions};
