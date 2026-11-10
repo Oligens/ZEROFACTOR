@@ -74,10 +74,13 @@ def cargo(data):
     for p in packages:
         deps=[];unresolved=[]
         for raw in p.get("dependencies",[]):
-            m=re.match(r"^(.+?) ([^ ]+)(?: \((.+)\))?$",raw)
-            if not m:unresolved.append(raw);continue
-            name,version,source=m.group(1),m.group(2),m.group(3)
-            hits=[x for x in index.get(name.lower(),[]) if x.get("version")==version and (source is None or x.get("source")==source)]
+            m=re.match(r"^(.+?) ([^ ]+)(?: \\((.+)\\))?$",raw)
+            if m:
+                name,version,source=m.group(1),m.group(2),m.group(3)
+                hits=[x for x in index.get(name.lower(),[]) if x.get("version")==version and (source is None or x.get("source")==source)]
+            else:
+                # Newer Cargo.lock versions may omit version/source when the name is unambiguous.
+                name=raw.strip();hits=index.get(name.lower(),[])
             if len(hits)==1:deps.append(hits[0]["name"]+"@"+hits[0]["version"])
             else:unresolved.append(raw)
         out.append(row("crates.io",p["name"],p["version"],p.get("source","registry/local"),sorted(set(deps)),unresolved,checksum=p.get("checksum")))
