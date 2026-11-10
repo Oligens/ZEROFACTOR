@@ -47,13 +47,19 @@ Run the complete Python suite:
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
-Run an offline module using a valid scope and a synthetic fixture:
+Copy the example scope and edit it only with written authorization:
 
 ```bash
-python3 scripts/controlled_modules.py --module AUTH --scope scripts/scope.json --fixture fixtures/auth.json --output reports/auth.json
+cp scripts/controlled-scope.example.json scripts/controlled-scope.json
 ```
 
-Supported modules: AUTH, INPUT, FILE, RATE and RECOVERY. The evaluator makes zero network connections and reads no target files. See [controlled testing](docs/CONTROLLED_TESTING.md) and [module contracts](docs/CONTROLLED_MODULES.md).
+The example is intentionally unauthorized. Set `authorized` to `true` only after replacing the authorization ID and owner with valid written authorization details. Then run an offline evaluator:
+
+```bash
+python3 scripts/controlled_modules.py --module AUTH --scope scripts/controlled-scope.json --fixture fixtures/controlled/auth.json --output reports/auth.json
+```
+
+Supported offline modules: AUTH, INPUT, FILE, RATE and RECOVERY. They make zero network connections and read no target files. RATE's example is expected to return `inconclusive` because a small unthrottled sample cannot prove that rate limiting is absent. See [controlled testing](docs/CONTROLLED_TESTING.md), [module contracts](docs/CONTROLLED_MODULES.md) and [synthetic fixture examples](fixtures/controlled/README.md).
 
 The separate HTTP posture runner requires an unexpired authorization scope, exact HTTPS host allowlisting and GET-only passive checks. Do not run it against a system without written authorization.
 
