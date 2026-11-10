@@ -26,14 +26,14 @@ def run(scope_path, output, selected):
         with opener.open(request,timeout=8) as response:
             body=response.read(MAX_BODY+1)
             if len(body)>MAX_BODY: body=body[:MAX_BODY]
-            status=response.status; headers={k.lower():v for k,v in response.headers.items()}
+            status=response.status; headers={k.lower():v for k,v in response.headers.items()}; cookie_values=response.headers.get_all("Set-Cookie") or []
     except urllib.error.HTTPError as e:
-        status=e.code; headers={k.lower():v for k,v in e.headers.items()}; body=b""
+        status=e.code; headers={k.lower():v for k,v in e.headers.items()}; cookie_values=e.headers.get_all("Set-Cookie") or []; body=b""
     except Exception as exc: raise RuntimeError("Target request failed safely: "+type(exc).__name__) from exc
     elapsed_ms=round((time.monotonic()-started)*1000,2)
     missing=[]
     if "security_headers" in selected:
-        for h in ("content-security-policy","x-content-type-options","referrer-policy","permissions-policy"):
+        for h in ("content-security-policy","x-content-type-options","referrer-policy","permissions-policy","strict-transport-security"):
             if h not in headers: missing.append(h)
     cookie_issues=[]
     if "cookie_flags" in selected:
