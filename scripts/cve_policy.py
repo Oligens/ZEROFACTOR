@@ -19,7 +19,7 @@ def evaluate(data,policy,now=None):
         name=source.get("name","unknown");seen.add(name)
         updated=parse_time(source.get("last_updated") or source.get("database_last_modified"))
         age=(now-updated).total_seconds()/86400 if updated else None
-        fresh=name in allowed and age is not None and -1<=age<=max_age
+        fresh=name in allowed and age is not None and -(5/1440)<=age<=max_age
         freshness.append({"source":name,"last_updated":source.get("last_updated") or source.get("database_last_modified"),"age_days":round(age,2) if age is not None else None,"fresh":fresh})
         if name not in allowed:source_errors.append(f"Unapproved advisory source: {name}")
         elif not fresh:source_errors.append(f"Missing, invalid or stale database timestamp for {name}")
