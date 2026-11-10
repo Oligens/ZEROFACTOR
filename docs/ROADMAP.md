@@ -26,7 +26,7 @@
 - [x] Explicit scope file format and guarded gVisor launcher
 - [x] Network-disabled, read-only, least-privilege resource-constrained container launch
 - [x] Host-side gVisor smoke-test script and manual self-hosted runner workflow
-- [x] Evidence/impact JSON schema
+- [x] Evidence/impact JSON schema\n- [x] Assessment assembly script links advisory matches, evidence IDs and impact measurements to findings
 - [ ] Execute host validation on a dedicated Linux + gVisor runner
 - [ ] Independent sandbox escape, side-channel and resource-boundary testing
 - [ ] Signed authorization manifests and immutable audit trail
