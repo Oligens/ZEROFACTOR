@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Fail-closed validation for explicit ZEROFACTOR controlled-test authorization scopes."""
 import datetime as dt
+import ipaddress
 import json
 import pathlib
 import urllib.parse
 
 ALLOWED_MODULES = {"HTTP_POSTURE", "AUTH", "INPUT", "FILE", "TLS", "RATE", "RECOVERY"}
+LIVE_MODULES = {"HTTP_POSTURE", "AUTH", "FILE", "RATE", "RECOVERY"}
 MAX_REQUESTS = 12
 MAX_TIMEOUT_SECONDS = 30
 
@@ -60,7 +62,7 @@ def validate_scope(scope, now=None):
     if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= MAX_TIMEOUT_SECONDS:
         raise ValueError("timeout_seconds must be between 1 and 30")
     routes = scope.get("allowed_routes", [])
-    if not isinstance(routes, list) or len(routes) > 12:
+    if not isinstance(routes, list) or len(routes) > MAX_REQUESTS:
         raise ValueError("allowed_routes must be a list of at most 12 routes")
     route_ids = set()
     for route in routes:
@@ -74,15 +76,67 @@ def validate_scope(scope, now=None):
         route_ids.add(route_id)
         if "?" in route["path"] or "#" in route["path"] or "\\" in route["path"]:
             raise ValueError("query strings, fragments and backslashes are forbidden in allowlisted paths")
+        if route.get("module") is not None and route["module"] not in modules:
+            raise ValueError("route module is not explicitly authorized by scope")
+        if "max_response_bytes" in route and (
+            not isinstance(route["max_response_bytes"], int) or isinstance(route["max_response_bytes"], bool)
+            or not 0 <= route["max_response_bytes"] <= 65536
+        ):
+            raise ValueError("max_response_bytes must be between 0 and 65536")
+    live_network = scope.get("live_network", False)
+    if not isinstance(live_network, bool):
+        raise ValueError("live_network must be a boolean")
+    destination_ips = []
+    if live_network:
+        if not set(modules) & LIVE_MODULES:
+            raise ValueError("no supported read-only live module is authorized")
+        raw_ips = scope.get("allowed_destination_ips")
+        if not isinstance(raw_ips, list) or not 1 <= len(raw_ips) <= 8:
+            raise ValueError("live_network requires 1 to 8 explicit allowed_destination_ips")
+        for raw_ip in raw_ips:
+            try:
+                address = ipaddress.ip_address(raw_ip)
+            except ValueError as exc:
+                raise ValueError("allowed_destination_ips must contain literal IP addresses") from exc
+            if not address.is_global:
+                raise ValueError("live adapter refuses private, loopback, link-local, reserved or non-global destination IPs")
+            destination_ips.append(str(address))
+        if len(set(destination_ips)) != len(destination_ips):
+            raise ValueError("allowed_destination_ips must be unique")
+        if not routes or len(routes) > budget:
+            raise ValueError("live_network requires allowlisted routes within request_budget")
+        for route in routes:
+            route_module = route.get("module")
+            if route_module not in LIVE_MODULES or route_module not in modules:
+                raise ValueError("live route module must be explicitly authorized and supported")
+            method = route["method"]
+            if route_module == "FILE" and method != "HEAD":
+                raise ValueError("live FILE observations are HEAD-only")
+            if route_module in {"AUTH", "RATE", "RECOVERY", "HTTP_POSTURE"} and method != "GET":
+                raise ValueError("live AUTH/RATE/RECOVERY/HTTP_POSTURE observations are GET-only")
+            if route_module == "AUTH" and route.get("protected") is not True:
+                raise ValueError("live AUTH routes must be explicitly marked protected")
+            expected = route.get("expected_status")
+            if route_module in {"AUTH", "FILE", "RECOVERY", "HTTP_POSTURE"} and (
+                not isinstance(expected, list) or not expected or len(expected) > 5
+                or not all(isinstance(x, int) and not isinstance(x, bool) and 100 <= x <= 599 for x in expected)
+            ):
+                raise ValueError("live route requires a bounded expected_status list")
+        if "INPUT" in modules and any(r.get("module") == "INPUT" for r in routes):
+            raise ValueError("INPUT remains fixture-only; live write/submit probes are disabled")
     return {
         "authorization_id": scope["authorization_id"],
         "assessment_id": assessment_id,
         "owner": scope["owner"],
         "target_origin": f"https://{target.netloc}",
+        "target_host": target.hostname.lower().rstrip("."),
         "expires_at": expiry.astimezone(dt.timezone.utc).isoformat(),
         "modules": list(modules),
         "request_budget": budget,
         "timeout_seconds": timeout,
+        "live_network": live_network,
+        "allowed_destination_ips": destination_ips,
+        "allowed_routes": routes,
     }
 
 
