@@ -23,7 +23,9 @@ class RustEvidenceEndToEndTests(unittest.TestCase):
                     "--module", module, "--scope", str(SCOPE),
                     "--fixture", str(FIXTURES / f"{module.lower()}.json"),
                     "--output", str(output),
-                ], cwd=ROOT, check=True, capture_output=True, text=True)
+                ], cwd=ROOT, check=False, capture_output=True, text=True)
+                self.assertIn(0 if module != "RATE" else 2, (0, 1, 2))
+                self.assertTrue(output.is_file(), msg=f"{module} did not emit an evidence envelope")
                 evidence_paths.append(output)
 
             target = temp / "target"
