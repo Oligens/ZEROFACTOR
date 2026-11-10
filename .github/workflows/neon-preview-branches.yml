@@ -167,7 +167,6 @@ jobs:
             body: JSON.stringify({
               name: 'zerofactor',
               project,
-              target: 'preview',
               gitSource: {
                 type: 'github',
                 org: 'Oligens',
