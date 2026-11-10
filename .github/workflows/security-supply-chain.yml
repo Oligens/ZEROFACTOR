@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install lockfile parser dependencies
+        run: python -m pip install --requirement requirements-security.txt
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.x"
@@ -28,7 +30,14 @@ jobs:
         with:
           tool: cargo-audit
       - name: RustSec advisory audit
-        run: cargo audit --deny warnings
+        shell: bash
+        run: |
+          set +e
+          cargo audit --json > rustsec-results.json
+          status=$?
+          set -e
+          echo "$status" > rustsec-scanner.exit-code
+          if [ "$status" -gt 1 ]; then exit "$status"; fi
       - name: Install OSV-Scanner
         run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.2.2
       - name: Scan supported lockfiles against OSV
@@ -40,11 +49,15 @@ jobs:
           set -e
           echo "$status" > osv-scanner.exit-code
           if [ "$status" -gt 1 ]; then exit "$status"; fi
-      - name: Normalize exact-version advisory matches
-        run: python3 scripts/normalize_osv.py osv-results.json --output advisory-results.json
+      - name: Normalize OSV and RustSec exact-version advisory matches
+        run: python3 scripts/normalize_osv.py osv-results.json --rustsec-input rustsec-results.json --output advisory-results.json
       - name: Fetch trusted OSV database freshness metadata
-        run: python3 scripts/fetch_osv_metadata.py --output source-metadata.json
-      - name: Enforce mandatory CVE policy
+        run: python3 scripts/fetch_osv_metadata.py --output osv-source-metadata.json
+      - name: Fetch trusted RustSec database freshness metadata
+        run: python3 scripts/fetch_rustsec_metadata.py --output rustsec-source-metadata.json
+      - name: Combine trusted advisory-source metadata
+        run: python3 scripts/merge_source_metadata.py osv-source-metadata.json rustsec-source-metadata.json --output source-metadata.json
+      - name: Enforce mandatory multi-source CVE policy
         run: python3 scripts/cve_policy.py advisory-results.json --source-metadata source-metadata.json --output cve-policy-result.json
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@v0
@@ -65,6 +78,7 @@ jobs:
             --advisories advisory-results.json \
             --policy-result cve-policy-result.json \
             --osv-exit-code "$(cat osv-scanner.exit-code)" \
+            --rustsec-exit-code "$(cat rustsec-scanner.exit-code)" \
             --spdx sbom.spdx.json \
             --cyclonedx sbom.cdx.json \
             --output assessment-gate.json
@@ -77,7 +91,11 @@ jobs:
             dependency-graph.json
             osv-results.json
             osv-scanner.exit-code
+            rustsec-results.json
+            rustsec-scanner.exit-code
             advisory-results.json
+            osv-source-metadata.json
+            rustsec-source-metadata.json
             source-metadata.json
             cve-policy-result.json
             sbom.spdx.json
@@ -91,6 +109,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install lockfile parser dependencies
+        run: python -m pip install --requirement requirements-security.txt
       - run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh
       - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - run: test -s dashboard/index.html && test -s dashboard/app.js
