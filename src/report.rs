@@ -17,6 +17,20 @@ pub fn markdown(a: &Assessment) -> String {
     }
     let _ = writeln!(out, "- **Coverage:** {:.1}%\n", a.coverage() * 100.0);
     let _ = writeln!(out, "> ZFI is an experimental evidence indicator, not a probability, certification, or proof of security. Heuristic findings require human review.\n");
+    let _ = writeln!(out, "## Evidence provenance\n");
+    if a.evidence.records.is_empty() {
+        let _ = writeln!(out, "No external evidence records were ingested.\n");
+    } else {
+        let simulated = a.evidence.records.iter().filter(|r| r.classification == crate::evidence::EvidenceClass::Simulated).count();
+        let reproduced = a.evidence.records.iter().filter(|r| r.classification == crate::evidence::EvidenceClass::Reproduced).count();
+        let verified = a.evidence.records.iter().filter(|r| r.classification == crate::evidence::EvidenceClass::IndependentlyVerified).count();
+        let _ = writeln!(out, "- Evidence records: {}", a.evidence.records.len());
+        let _ = writeln!(out, "- Synthetic/simulated: {simulated}");
+        let _ = writeln!(out, "- Reproduced: {reproduced}");
+        let _ = writeln!(out, "- Independently verified: {verified}");
+        let _ = writeln!(out, "- Unlinked evidence records: {}\n", a.evidence.unlinked.len());
+        let _ = writeln!(out, "> Synthetic fixture evidence is not proof of a live vulnerability. Findings created from synthetic fixtures are marked [SIMULATION] and require review.\n");
+    }
     let _ = writeln!(out, "## Repository components\n| Path | Classification |\n|---|---|");
     if a.components.is_empty() { let _ = writeln!(out, "| — | No top-level component directory discovered |"); }
     for component in &a.components { let _ = writeln!(out, "| {} | {} |", component.path.display(), component.kind); }
@@ -46,8 +60,8 @@ fn write_finding(out: &mut String, f: &Finding) {
     let _ = writeln!(out, "- **Recommendation:** {}\n", f.recommendation);
 }
 pub fn json(a: &Assessment) -> String {
-    let evidence_records=serde_json::to_string(&a.evidence.records).unwrap_or_else(|_|"[]".into());
-    let impact_summary=serde_json::to_string(&a.evidence.impact_summary()).unwrap_or_else(|_|"{}".into());
+    let evidence_records = serde_json::to_string(&a.evidence.records).unwrap_or_else(|_| "[]".into());
+    let impact_summary = serde_json::to_string(&a.evidence.impact_summary()).unwrap_or_else(|_| "{}".into());
     let findings = a.findings.iter().map(|f| format!(
         "{{\"id\":{},\"category\":{},\"severity\":{},\"status\":{},\"title\":{},\"path\":{},\"line\":{},\"evidence\":{},\"recommendation\":{}}}",
         q(&f.id), q(&f.category), q(f.severity.as_str()), q(f.status.as_str()), q(&f.title), q(&f.path.display().to_string()),
@@ -83,5 +97,6 @@ mod tests {
         let j = json(&a);
         assert!(j.contains("\\\"quote\\\""));
         assert!(j.starts_with("{"));
+        assert!(serde_json::from_str::<serde_json::Value>(&j).is_ok());
     }
 }
