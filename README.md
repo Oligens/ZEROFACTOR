@@ -32,7 +32,9 @@ The extractor does not install packages or execute target code. Review the graph
 
 Combine static, dependency, advisory and evidence records into one dashboard-ready assessment:
 
-```bash\npython3 scripts/assemble_assessment.py --report reports/assessment.json --dependencies reports/dependency-graph.json --advisories reports/advisory-results.json --evidence reports/evidence.json --output reports/assessment-platform.json\n```
+```bash
+python3 scripts/assemble_assessment.py --report reports/assessment.json --dependencies reports/dependency-graph.json --advisories reports/advisory-results.json --evidence reports/evidence.json --output reports/assessment-platform.json
+```
 
 ## Dependency and advisory checks
 
