@@ -22,7 +22,7 @@ def version_satisfies(spec, locked):
     for clause in spec.split(","):
         clause=clause.strip()
         if not clause or clause=="*":continue
-        clause=re.sub(r"^(>=|<=|==|!=|>|<|=|~>|~|\\^)\\s+",r"\\1",clause)
+        clause=re.sub(r"^(>=|<=|==|!=|>|<|=|~>|~|\^)\s+",r"\1",clause)
         if clause.startswith("~>"):
             base=version_tuple(clause[2:])
             if base is None or actual<base:return False
@@ -225,10 +225,10 @@ def gemfile_lock(path):
         if line.strip()=="specs:":in_specs=True;current=None;continue
         if line and not line.startswith("      ") and not line.startswith("    ") and line.strip() in ("PLATFORMS","DEPENDENCIES","BUNDLED WITH","GIT","PATH","GEM"):in_specs=False
         if not in_specs:continue
-        match=re.match(r"^    ([^ ]+) \\(([^)]+)\\)$",line)
+        match=re.match(r"^    ([^ ]+) \(([^)]+)\)$",line)
         if match:
             current={"name":match.group(1),"version":match.group(2),"dependencies":[]};packages.append(current);continue
-        dep=re.match(r"^      ([^ ]+) \\(([^)]+)\\)$",line)
+        dep=re.match(r"^      ([^ ]+) \(([^)]+)\)$",line)
         if dep and current:current["dependencies"].append((dep.group(1),dep.group(2)))
     index={}
     for p in packages:index.setdefault(p["name"].lower(),[]).append(p)
