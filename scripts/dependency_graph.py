@@ -464,7 +464,9 @@ def main():
         if p.is_file() and p.name in names:files.append(p)
     for p in sorted(files):
         try:
-            if p.name=="gradle.lockfile" and any(x.name=="gradle-dependencies.txt" for x in files):\n                continue\n            for item in extract(p):
+            if p.name=="gradle.lockfile" and any(x.name=="gradle-dependencies.txt" for x in files):
+                continue
+            for item in extract(p):
                 item["lockfile"]=str(p.relative_to(root));key=(item["ecosystem"],item["name"],item["version"],item["lockfile"],item["source"])
                 if key not in seen:found.append(item);seen.add(key)
         except Exception as e:errors.append({"lockfile":str(p.relative_to(root)),"error":str(e)})
