@@ -8,14 +8,16 @@ import argparse, json, pathlib, re, sys, tomllib
 def cargo(data):
     rows=data.get("package",[]); out=[]
     for p in rows:
-        deps=[]
+        deps=[]; unresolved=[]
         for raw in p.get("dependencies",[]):
-            m=re.match(r"^(.+?) ([^ ]+)(?: \((.+)\))?$",raw)
-            if not m: continue
+            m=re.match(r"^(.+?) ([^ ]+)(?: \\((.+)\\))?$",raw)
+            if not m:
+                unresolved.append(raw); continue
             name,ver,src=m.group(1),m.group(2),m.group(3)
             matches=[x for x in rows if x.get("name")==name and x.get("version")==ver and (src is None or x.get("source")==src)]
             if len(matches)==1: deps.append(matches[0]["name"]+"@"+matches[0]["version"])
-        out.append(dict(ecosystem="crates.io",name=p["name"],version=p["version"],source=p.get("source","registry/local"),checksum=p.get("checksum"),dependencies=sorted(set(deps))))
+            else: unresolved.append(raw)
+        out.append(dict(ecosystem="crates.io",name=p["name"],version=p["version"],source=p.get("source","registry/local"),checksum=p.get("checksum"),dependencies=sorted(set(deps)),unresolved_dependencies=unresolved,graph_complete=not unresolved))
     return out
 
 def npm(data):
@@ -28,14 +30,16 @@ def npm(data):
         if not name:
             m=re.search(r"(?:^|/)node_modules/(.+)$",loc); name=m.group(1) if m else None
         if not name: continue
-        deps=[]
+        deps=[]; unresolved=[]
         for dep in (p.get("dependencies") or {}):
             base=(loc+"/" if loc else "")+"node_modules/"+dep
             candidates=[k for k in keys if k==base or k.endswith("/"+base)]
             if candidates:
                 candidate=sorted(candidates,key=len)[-1]; q=packages[candidate]
                 if q.get("version"): deps.append((q.get("name") or dep)+"@"+q["version"])
-        out.append(dict(ecosystem="npm",name=name,version=str(p["version"]),source=loc or ".",integrity=p.get("integrity"),dependencies=sorted(set(deps))))
+                else: unresolved.append(dep)
+            else: unresolved.append(dep)
+        out.append(dict(ecosystem="npm",name=name,version=str(p["version"]),source=loc or ".",integrity=p.get("integrity"),dependencies=sorted(set(deps)),unresolved_dependencies=unresolved,graph_complete=not unresolved))
     return out
 
 def python_toml(data,kind):
