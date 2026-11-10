@@ -62,7 +62,7 @@ pub fn json(a: &Assessment) -> String {
         "{{\"id\":{},\"description\":{},\"weight\":{},\"tested\":{},\"failure_factor\":{}}}",
         q(&c.id), q(&c.description), c.weight, c.tested, c.failure_factor
     )).collect::<Vec<_>>().join(",");
-    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{}}",
+    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{}}}",
         q(&a.root.display().to_string()), a.files_examined, a.files_skipped, a.bytes_examined,
         a.zfi().map(|v| v.to_string()).unwrap_or_else(|| "null".into()), a.coverage(), components, dependencies, findings, checks,
         a.warnings.iter().map(|w| q(w)).collect::<Vec<_>>().join(","), evidence_records, impact_summary)

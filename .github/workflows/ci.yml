@@ -22,5 +22,7 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Test local dashboard API and project isolation
         run: python3 -m unittest discover -s server -p 'test_*.py'
+      - name: Validate dashboard JavaScript syntax
+        run: node --check dashboard/app.js
       - name: Validate shell scripts
         run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh

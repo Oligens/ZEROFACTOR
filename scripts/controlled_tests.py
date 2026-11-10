@@ -26,14 +26,14 @@ def run(scope_path, output, selected):
         with opener.open(request,timeout=8) as response:
             body=response.read(MAX_BODY+1)
             if len(body)>MAX_BODY: body=body[:MAX_BODY]
-            status=response.status; headers={k.lower():v for k,v in response.headers.items()}
+            status=response.status; headers={k.lower():v for k,v in response.headers.items()}; cookie_values=response.headers.get_all("Set-Cookie") or []
     except urllib.error.HTTPError as e:
-        status=e.code; headers={k.lower():v for k,v in e.headers.items()}; body=b""
+        status=e.code; headers={k.lower():v for k,v in e.headers.items()}; cookie_values=e.headers.get_all("Set-Cookie") or []; body=b""
     except Exception as exc: raise RuntimeError("Target request failed safely: "+type(exc).__name__) from exc
     elapsed_ms=round((time.monotonic()-started)*1000,2)
     missing=[]
     if "security_headers" in selected:
-        for h in ("content-security-policy","x-content-type-options","referrer-policy","permissions-policy"):
+        for h in ("content-security-policy","x-content-type-options","referrer-policy","permissions-policy","strict-transport-security"):
             if h not in headers: missing.append(h)
     cookie_issues=[]
     if "cookie_flags" in selected:
@@ -41,7 +41,7 @@ def run(scope_path, output, selected):
             low=value.lower()
             if value and ("secure" not in low or "httponly" not in low or "samesite" not in low): cookie_issues.append("cookie_missing_recommended_flags")
     checks=[]
-    if "security_headers" in selected: checks.append({"test_id":"HTTP-SEC-HEADERS","result":"fail" if missing else "pass","observed":{"missing_headers":missing},"impact":[{"dimension":"exposure","value":len(missing),"unit":"missing_security_headers","method":"response_header_presence","confidence":0.95}]})
+    if "security_headers" in selected: checks.append({"test_id":"HTTP-SEC-HEADERS","result":"fail" if missing else "pass","observed":{"missing_headers":missing},"impact":[{"dimension":"security_posture","value":len(missing),"unit":"missing_security_headers","method":"response_header_presence","confidence":0.95}]})
     if "cookie_flags" in selected: checks.append({"test_id":"HTTP-COOKIE-FLAGS","result":"fail" if cookie_issues else "pass","observed":{"issues":cookie_issues},"impact":[{"dimension":"session_hardening","value":len(cookie_issues),"unit":"cookies_without_recommended_flags","method":"set_cookie_header_review","confidence":0.7}]})
     if "https_target_only" in selected: checks.append({"test_id":"HTTP-HTTPS-TARGET","result":"pass","observed":{"scheme":"https","status":status},"impact":[]})
     artifact_dir=pathlib.Path(output).with_suffix("").parent/"evidence-artifacts"; artifact_dir.mkdir(parents=True,exist_ok=True)

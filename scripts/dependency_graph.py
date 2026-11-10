@@ -22,7 +22,14 @@ def version_satisfies(spec, locked):
     for clause in spec.split(","):
         clause=clause.strip()
         if not clause or clause=="*":continue
-        if clause.startswith("^") or clause.startswith("~"):
+        clause=re.sub(r"^(>=|<=|==|!=|>|<|=|~>|~|\^)\s+",r"\1",clause)
+        if clause.startswith("~>"):
+            base=version_tuple(clause[2:])
+            if base is None or actual<base:return False
+            parts=clause[2:].strip().split(".")
+            upper=(base[0],base[1]+1,0) if len(parts)>=3 else (base[0]+1,0,0)
+            if actual>=upper:return False
+        elif clause.startswith("^") or clause.startswith("~"):
             base=version_tuple(clause[1:])
             if base is None or actual<base:return False
             if clause.startswith("^"):
@@ -68,9 +75,12 @@ def cargo(data):
         deps=[];unresolved=[]
         for raw in p.get("dependencies",[]):
             m=re.match(r"^(.+?) ([^ ]+)(?: \((.+)\))?$",raw)
-            if not m:unresolved.append(raw);continue
-            name,version,source=m.group(1),m.group(2),m.group(3)
-            hits=[x for x in index.get(name.lower(),[]) if x.get("version")==version and (source is None or x.get("source")==source)]
+            if m:
+                name,version,source=m.group(1),m.group(2),m.group(3)
+                hits=[x for x in index.get(name.lower(),[]) if x.get("version")==version and (source is None or x.get("source")==source)]
+            else:
+                # Newer Cargo.lock versions may omit version/source when the name is unambiguous.
+                name=raw.strip();hits=index.get(name.lower(),[])
             if len(hits)==1:deps.append(hits[0]["name"]+"@"+hits[0]["version"])
             else:unresolved.append(raw)
         out.append(row("crates.io",p["name"],p["version"],p.get("source","registry/local"),sorted(set(deps)),unresolved,checksum=p.get("checksum")))
@@ -195,6 +205,55 @@ def pipfile(data):
             if isinstance(p,dict) and p.get("version"):out.append(row("PyPI",name,str(p["version"]).lstrip("="),"Pipfile.lock",[],["dependency_edges_not_encoded_by_lockfile"]))
     return out
 
+def composer(data):
+    packages=(data.get("packages") or [])+(data.get("packages-dev") or [])
+    index={}
+    for p in packages:
+        if isinstance(p,dict) and p.get("name") and p.get("version"):index.setdefault(p["name"].lower(),[]).append(p)
+    out=[]
+    for p in packages:
+        if not isinstance(p,dict) or not p.get("name") or not p.get("version"):continue
+        deps=[];unresolved=[]
+        for name,constraint in (p.get("require") or {}).items():
+            if name.startswith(("php","ext-","lib-")):continue
+            hits=index.get(name.lower(),[])
+            if len(hits)==1 and version_satisfies(constraint,hits[0]["version"]):deps.append(hits[0]["name"]+"@"+str(hits[0]["version"]))
+            else:unresolved.append(name+" ("+str(constraint)+")")
+        out.append(row("Packagist",p["name"],p["version"],"composer.lock",sorted(set(deps)),unresolved,dist=(p.get("dist") or {}).get("reference")))
+    return out
+
+def gemfile_lock(path):
+    packages=[];current=None;in_specs=False
+    for line in path.read_text(errors="replace").splitlines():
+        if line.strip()=="specs:":in_specs=True;current=None;continue
+        if line and not line.startswith("      ") and not line.startswith("    ") and line.strip() in ("PLATFORMS","DEPENDENCIES","BUNDLED WITH","GIT","PATH","GEM"):in_specs=False
+        if not in_specs:continue
+        match=re.match(r"^    ([^ ]+) \(([^)]+)\)$",line)
+        if match:
+            current={"name":match.group(1),"version":match.group(2),"dependencies":[]};packages.append(current);continue
+        dep=re.match(r"^      ([^ ]+) \(([^)]+)\)$",line)
+        if dep and current:current["dependencies"].append((dep.group(1),dep.group(2)))
+    index={}
+    for p in packages:index.setdefault(p["name"].lower(),[]).append(p)
+    out=[]
+    for p in packages:
+        deps=[];unresolved=[]
+        for name,constraint in p["dependencies"]:
+            hits=index.get(name.lower(),[])
+            if len(hits)==1 and version_satisfies(constraint,hits[0]["version"]):deps.append(hits[0]["name"]+"@"+hits[0]["version"])
+            else:unresolved.append(name+" ("+constraint+")")
+        out.append(row("RubyGems",p["name"],p["version"],"Gemfile.lock",sorted(set(deps)),unresolved))
+    return out
+
+def gradle_lock(path):
+    out=[]
+    for line in path.read_text(errors="replace").splitlines():
+        value=line.split("#",1)[0].strip()
+        if not value or "=" not in value:continue
+        coordinate=value.split("=",1)[0].strip();parts=coordinate.split(":")
+        if len(parts)>=3:out.append(row("Maven",parts[-2],parts[-1],"gradle.lockfile",[],["lockfile_records_versions_not_dependency_edges"],group=":".join(parts[:-2])))
+    return out
+
 def go_sum(path):
     out=[]
     for line in path.read_text(errors="replace").splitlines():
@@ -207,6 +266,9 @@ def extract(path):
     n=path.name
     if n=="Cargo.lock":return cargo(tomllib.loads(path.read_text()))
     if n in ("package-lock.json","npm-shrinkwrap.json"):return npm(json.loads(path.read_text()))
+    if n=="composer.lock":return composer(json.loads(path.read_text()))
+    if n=="Gemfile.lock":return gemfile_lock(path)
+    if n=="gradle.lockfile":return gradle_lock(path)
     if n=="yarn.lock":return yarn_classic(path)
     if n in ("poetry.lock","uv.lock"):return python_toml(tomllib.loads(path.read_text()),n)
     if n=="Pipfile.lock":return pipfile(json.loads(path.read_text()))
@@ -216,7 +278,7 @@ def extract(path):
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("root",type=pathlib.Path);ap.add_argument("--output",type=pathlib.Path,default=pathlib.Path("dependency-graph.json"));a=ap.parse_args()
     root=a.root.resolve();found=[];seen=set();errors=[];files=[]
-    names={"Cargo.lock","package-lock.json","npm-shrinkwrap.json","yarn.lock","poetry.lock","uv.lock","Pipfile.lock","go.sum"}
+    names={"Cargo.lock","package-lock.json","npm-shrinkwrap.json","yarn.lock","poetry.lock","uv.lock","Pipfile.lock","go.sum","composer.lock","Gemfile.lock","gradle.lockfile"}
     for p in root.rglob("*"):
         if any(x in {".git","node_modules","target",".venv","vendor"} for x in p.parts):continue
         if p.is_file() and p.name in names:files.append(p)
@@ -228,8 +290,8 @@ def main():
         except Exception as e:errors.append({"lockfile":str(p.relative_to(root)),"error":str(e)})
     complete=bool(files) and not errors and bool(found) and all(x.get("graph_complete",False) for x in found)
     result={"schema_version":"1.1","target":str(root),"lockfiles_found":len(files),"packages":found,"package_count":len(found),"graph_complete":complete,
-        "coverage":{"native_edge_formats":["Cargo.lock","npm package-lock v1-v3","Yarn classic v1","Poetry.lock","uv.lock"],"inventory_only_formats":["Pipfile.lock","go.sum"]},
-        "limitations":["Yarn Berry, pnpm, Gradle, Maven, Composer, Bundler and other lockfile formats require their native ecosystem adapters and are not claimed complete here.","Python duplicate package versions or unresolved dependency names keep graph_complete false; dependency constraints are not fully evaluated against PEP 440.","Pipfile.lock and go.sum do not encode complete dependency edges.","Private registries, platform markers, optional dependencies and omitted lockfiles can reduce coverage.","No package is installed and no target project code is executed."],"errors":errors}
+        "coverage":{"native_edge_formats":["Cargo.lock","npm package-lock v1-v3","Yarn classic v1","Poetry.lock","uv.lock","composer.lock","Gemfile.lock"],"inventory_only_formats":["Pipfile.lock","go.sum","gradle.lockfile"]},
+        "limitations":["Yarn Berry, pnpm, Maven, Bundler and other lockfile formats require their native ecosystem adapters and are not claimed complete here.","Python duplicate package versions or unresolved dependency names keep graph_complete false; dependency constraints are not fully evaluated against PEP 440.","Pipfile.lock and go.sum do not encode complete dependency edges.","Private registries, platform markers, optional dependencies and omitted lockfiles can reduce coverage.","No package is installed and no target project code is executed."],"errors":errors}
     a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(result,indent=2)+"\n")
     print(f"lockfiles={len(files)} packages={len(found)} graph_complete={complete} errors={len(errors)}")
     return 1 if errors else 0

@@ -18,7 +18,7 @@ Native dependency edges:
 - npm package-lock v1: nested dependency tree.
 - npm package-lock v2/v3 and npm-shrinkwrap: package versions, integrity and nested dependency edges.
 - Yarn classic v1: package versions and edges when a selector resolves unambiguously.
-- Poetry.lock and uv.lock: package inventory and dependency-name resolution where a unique locked package exists.
+- Poetry.lock and uv.lock: package inventory and dependency-name resolution where a unique locked package exists; common exact, caret, tilde and comparison constraints are checked conservatively.\n- composer.lock: Packagist packages and `require` edges, excluding platform packages.\n- Gemfile.lock: RubyGems package versions and dependency edges with supported version constraints.\n- gradle.lockfile: exact coordinate inventory only; Gradle lockfiles do not encode dependency edges.
 
 Inventory-only / incomplete:
 - Pipfile.lock: exact pins, but the lock format does not encode the full dependency edge graph.

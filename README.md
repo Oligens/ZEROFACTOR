@@ -10,7 +10,7 @@ ZEROFACTOR evaluates whether security guarantees declared by a system are suppor
 
 The repository inventory MVP and dependency/advisory foundations are merged into `main`. The current feature branch adds npm v1 and Yarn classic graph adapters, a fail-closed advisory severity/freshness policy, bounded HTTPS posture checks, typed Rust evidence aggregation, and a server-backed local dashboard with authentication and project-scoped roles.
 
-**These additions are not a claim that all platform objectives are complete.** Native graph coverage remains incomplete for pnpm, Yarn Berry, Gradle, Maven, Composer, Bundler and other ecosystems. Python constraints are not fully evaluated; Pipfile.lock and go.sum are inventory-only. CVE freshness enforcement requires trusted upstream source metadata and currently gates OSV only; RustSec remains a separate audit. The gVisor host workflow has not been executed on a dedicated host. Controlled checks are passive HTTP posture checks, not a general penetration-testing engine. Production multi-user deployment and independently verified sandbox escape resistance remain future work.
+**These additions are not a claim that all platform objectives are complete.** Native graph coverage remains incomplete for pnpm, Yarn Berry, Maven, Bundler and other ecosystems; Gradle lockfiles are inventory-only. Python constraints are not fully evaluated; Pipfile.lock and go.sum are inventory-only. CVE freshness enforcement requires trusted upstream source metadata and currently gates OSV only; RustSec remains a separate audit. The gVisor host workflow has not been executed on a dedicated host. Controlled checks are passive HTTP posture checks, not a general penetration-testing engine. Production multi-user deployment and independently verified sandbox escape resistance remain future work.
 
 ## Quick start
 
@@ -47,7 +47,7 @@ Open `http://127.0.0.1:8765/`. Accounts, project memberships, assessment history
 
 ```bash
 python3 -m unittest discover -s scripts -p 'test_*.py'
-python3 scripts/controlled_tests.py --scope scripts/http-scope.json --checks security_headers cookie_flags --output reports/http-checks.json
+cp scripts/http-scope.example.json scripts/http-scope.json\n# Edit scripts/http-scope.json with written authorization and the exact HTTPS host.\npython3 scripts/controlled_tests.py --scope scripts/http-scope.json --checks security_headers cookie_flags --output reports/http-checks.json
 ```
 The HTTP runner requires an unexpired authorization scope, exact HTTPS host allowlisting and uses GET-only passive checks. See [controlled testing](docs/CONTROLLED_TESTING.md).
 
