@@ -370,7 +370,7 @@ fn parse_result(value: &str) -> Result<EvidenceResult, String> {
 }
 
 fn looks_like_timestamp(value: &str) -> bool {
-    value.contains('T') && (value.ends_with('Z') || value.rfind(|c| c == '+' || c == '-').map(|i| i > 10).unwrap_or(false))
+    value.contains('T') && (value.ends_with('Z') || value.rfind(['+', '-']).map(|i| i > 10).unwrap_or(false))
 }
 
 #[cfg(test)]
