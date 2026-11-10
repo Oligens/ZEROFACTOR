@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "framework": null,
+  "outputDirectory": "dashboard",
+  "functions": {
+    "api/[...path].js": {
+      "maxDuration": 15
+    }
+  }
+}

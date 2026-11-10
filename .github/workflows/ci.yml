@@ -24,7 +24,9 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Test local dashboard API and project isolation
         run: python3 -m unittest discover -s server -p 'test_*.py'
-      - name: Validate dashboard JavaScript syntax
-        run: node --check dashboard/app.js
+      - name: Validate dashboard and Vercel API JavaScript syntax
+        run: node --check dashboard/app.js && node --check 'api/[...path].js'
+      - name: Validate deployment configuration
+        run: node -e "JSON.parse(require('fs').readFileSync('package.json')); JSON.parse(require('fs').readFileSync('vercel.json'))"
       - name: Validate shell scripts
         run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh sandbox/run-controlled-fixture.sh sandbox/apply-vm-egress-policy.sh

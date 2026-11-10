@@ -1,0 +1,10 @@
+{
+  "name": "zerofactor",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ZEROFACTOR Vercel serverless dashboard backend",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}
