@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs, path::Path};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all="snake_case")]
 pub enum EvidenceResult { Pass, Fail, Inconclusive, NotRun }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all="snake_case")]
