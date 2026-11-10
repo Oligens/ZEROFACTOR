@@ -27,6 +27,9 @@ def validate(args):
         failures.append("Mandatory advisory-source freshness metadata is invalid or incomplete")
     if int(args.osv_exit_code) not in (0, 1):
         failures.append(f"OSV-Scanner execution failed with exit code {args.osv_exit_code}")
+    rustsec_exit_code = int(getattr(args, "rustsec_exit_code", 0))
+    if rustsec_exit_code not in (0, 1):
+        failures.append(f"cargo-audit execution failed with exit code {rustsec_exit_code}")
     if not isinstance(advisories.get("matches"), list):
         failures.append("Normalized advisory result is missing its matches array")
 
@@ -62,7 +65,8 @@ def validate(args):
         "required_checks": {
             "dependency_graph": "failed" if not graph.get("graph_complete") else "passed",
             "cve_policy": "passed" if policy.get("passed") is True else "failed",
-            "osv_scan": "passed" if int(args.osv_exit_code) in (0, 1) else "failed",\n            "rustsec_scan": "passed" if rustsec_exit_code in (0, 1) else "failed",
+            "osv_scan": "passed" if int(args.osv_exit_code) in (0, 1) else "failed",
+            "rustsec_scan": "passed" if rustsec_exit_code in (0, 1) else "failed",
             "spdx_sbom": "validated",
             "cyclonedx_sbom": "validated",
             "sbom_consistency": "validated" if len(sbom_sets) == 2 and sbom_sets[0][1] & sbom_sets[1][1] else "failed",
@@ -78,7 +82,8 @@ def main():
     parser.add_argument("--graph", required=True)
     parser.add_argument("--advisories", required=True)
     parser.add_argument("--policy-result", required=True)
-    parser.add_argument("--osv-exit-code", required=True, type=int)\n    parser.add_argument("--rustsec-exit-code", required=True, type=int)
+    parser.add_argument("--osv-exit-code", required=True, type=int)
+    parser.add_argument("--rustsec-exit-code", required=True, type=int)\n    parser.add_argument("--rustsec-exit-code", required=True, type=int)
     parser.add_argument("--spdx", required=True)
     parser.add_argument("--cyclonedx", required=True)
     parser.add_argument("--output", default="assessment-gate.json")
