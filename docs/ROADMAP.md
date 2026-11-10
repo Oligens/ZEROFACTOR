@@ -11,28 +11,35 @@
 
 ## Phase 2 — Dependency and supply-chain intelligence
 - [x] CI integration for RustSec cargo-audit
-- [x] CI integration for OSV-Scanner (currently non-blocking baseline)
+- [x] CI integration for OSV-Scanner (report-first baseline)
 - [x] CI generation of SPDX JSON and CycloneDX JSON artifacts
-- [ ] Native lockfile parsers for Cargo, npm/pnpm/yarn, Python and Go
-- [ ] Canonical dependency graph with platform/feature provenance
-- [ ] Advisory normalization, deduplication and timestamped database snapshots
-- [ ] Reachability and exploitability evidence; never infer from CVE presence alone
+- [x] Native exact-version extraction for Cargo, npm, Poetry, uv, Pipfile and Go checksums
+- [x] Initial lockfile dependency edges for Cargo and npm
+- [x] OSV exact-version advisory result normalization
+- [ ] Complete native graph resolution for all supported lockfile ecosystems
+- [ ] Platform/feature/optional dependency provenance and graph completeness proof
+- [ ] Advisory database snapshots, source freshness and multi-database deduplication
+- [ ] Reachability analysis; never infer from CVE presence alone
 - [ ] SBOM validation, license metadata and completeness reporting
 
 ## Phase 3 — Controlled verification
-- [x] Explicit scope file format and guarded gVisor launcher foundation
+- [x] Explicit scope file format and guarded gVisor launcher
 - [x] Network-disabled, read-only, least-privilege resource-constrained container launch
+- [x] Host-side gVisor smoke-test script and manual self-hosted runner workflow
+- [x] Evidence/impact JSON schema\n- [x] Assessment assembly script links advisory matches, evidence IDs and impact measurements to findings
+- [ ] Execute host validation on a dedicated Linux + gVisor runner
+- [ ] Independent sandbox escape, side-channel and resource-boundary testing
 - [ ] Signed authorization manifests and immutable audit trail
 - [ ] Dedicated VM-backed sandbox orchestration, lifecycle and cleanup
-- [ ] Isolation escape and resource-boundary verification suite
 - [ ] Safe deterministic test-case runner, kill switch and evidence capture
-- [ ] Controlled penetration-test modules for explicitly authorized lab targets
+- [ ] Controlled penetration-test modules for authorized lab targets
 - [ ] Measured impact and repeatable pre/post-test baselines
 
 ## Phase 4 — Evidence and platform
 - [x] Local JSON report dashboard foundation
-- [ ] Multi-project workspaces and persistent assessment history
-- [ ] Authentication, RBAC and tenant isolation
+- [x] Browser-local project workspace and assessment history
+- [x] Evidence records can be assembled and linked to findings with SHA-256 artifact verification when a local artifact path is supplied\n- [ ] Evidence records emitted automatically and cryptographically verified by the Rust engine
+- [ ] Server-side authentication, RBAC and tenant isolation
 - [ ] Signed evidence bundles and chain of custody
 - [ ] SARIF and professional PDF exports
 - [ ] CI policy gates and integrations
@@ -40,8 +47,4 @@
 - [ ] Hosted dashboard, audit trail and operational monitoring
 
 ## Release gates
-A feature is not considered complete until automated tests pass, security controls
-are independently verified, artifacts are reproducible, and limitations are
-explicitly reported. A workflow being configured does not mean a scan has passed;
-a sandbox launcher does not prove host isolation; and a test finding does not
-prove exploitability without reproducible evidence.
+A feature is not complete until automated tests pass, security controls are independently verified, artifacts are reproducible and limitations are explicit. A launcher does not prove host isolation; an advisory match does not prove exploitability; browser-side role selection is not secure RBAC.

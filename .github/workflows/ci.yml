@@ -1,20 +1,24 @@
 name: Rust CI
-
 on:
   push:
     branches: [main, "feature/**"]
   pull_request:
-
 permissions:
   contents: read
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Compile and test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and test Rust
         run: cargo test --all-targets
-      - name: Clippy (advisory)
+      - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Test lockfile graph extractors
+        run: python3 -m unittest scripts/test_dependency_graph.py scripts/test_platform_assembly.py
+      - name: Validate shell scripts
+        run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh

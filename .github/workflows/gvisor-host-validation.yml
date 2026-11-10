@@ -1,0 +1,15 @@
+name: gVisor host validation (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gvisor-host-smoke:
+    # Configure a dedicated disposable Linux runner with Docker + runsc and this label.
+    runs-on: [self-hosted, linux, gvisor]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify gVisor isolation controls
+        env:
+          ZEROFACTOR_TEST_IMAGE: ${{ vars.ZEROFACTOR_TEST_IMAGE }}
+        run: bash sandbox/verify-host.sh

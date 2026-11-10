@@ -1,28 +1,41 @@
-# Dependency intelligence, CVE audit and SBOM
+# Dependency intelligence, lockfile resolution and CVE coverage
 
-## Evidence levels
+## Resolution levels
 1. Declared: name and version constraint from a manifest.
-2. Resolved: exact version/source from a lockfile or package-manager resolution.
-3. Advisory-matched: resolved package/version matched to an advisory, with ID and database timestamp.
-4. Reachability-assessed: vulnerable code path is present and reachable.
-5. Exploitability-demonstrated: controlled reproducible test proves impact in an authorized lab.
+2. Resolved: exact package version extracted from a lockfile.
+3. Graph-resolved: dependency edges reconstructed from the lockfile.
+4. Advisory-matched: exact package/version sent to an advisory matcher, with advisory ID and source lockfile.
+5. Reachability-assessed: vulnerable code path is present and reachable.
+6. Exploitability-demonstrated: controlled reproducible test proves impact in an authorized lab.
 
-A manifest-only dependency is not fully resolved. An advisory match is not proof of exploitability.
+An exact version match is not proof of reachability or exploitability. A lockfile only describes its selected platform/features and may omit optional or private dependencies.
 
-## CI integration
-The security-supply-chain workflow runs cargo-audit (RustSec), OSV-Scanner and
-generates SPDX JSON and CycloneDX JSON SBOM artifacts using Syft through the
-Anchore action. OSV is temporarily non-blocking while the baseline is established;
-Cargo audit is blocking. Production hardening should pin third-party actions to
-reviewed full commit SHAs.
+## Native extractor
+Run:
+  python3 scripts/dependency_graph.py /path/to/repository --output dependency-graph.json
 
-## Local commands
-  cargo install cargo-audit --locked
-  cargo audit
-  osv-scanner scan source -r .
-  syft dir:. -o spdx-json=sbom.spdx.json
-  syft dir:. -o cyclonedx-json=sbom.cdx.json
+Current native graph extraction:
+- Cargo.lock: package versions, source/checksum and lockfile dependency edges.
+- npm package-lock v2/v3 and npm-shrinkwrap: package versions, integrity and nested dependency edges.
+- poetry.lock and uv.lock: exact PyPI versions and declared dependency names.
+- Pipfile.lock: exact pinned package versions; the file does not provide a full dependency edge graph.
+- go.sum: checksummed module versions only; it is not a complete module dependency graph.
 
-Transitive completeness depends on lockfiles, ecosystem support, platform and
-feature resolution, optional dependencies and private registries. SBOM consumers
-must review metadata and omissions.
+The extractor never installs packages or executes target code. Unsupported lockfile versions are reported as errors rather than silently treated as complete. Native graph coverage is therefore intentionally partial.
+
+## CVE/advisory sources
+CI combines:
+- RustSec through cargo-audit for Rust crates.
+- OSV-Scanner against OSV.dev for supported lockfiles across Rust, JavaScript, Python, Go and other documented ecosystems.
+- SPDX JSON and CycloneDX JSON SBOM artifacts.
+
+OSV-Scanner currently documents support for Cargo.lock, package-lock.json, pnpm-lock.yaml, yarn.lock, uv.lock, poetry.lock, Pipfile.lock, go.mod and other ecosystems. Its extractors and ecosystem coverage can change; see the [supported lockfiles](https://google.github.io/osv-scanner/supported-languages-and-lockfiles/) and [JSON output schema](https://google.github.io/osv-scanner/output/).
+
+The CI normalizer preserves package name, ecosystem, exact version emitted by OSV-Scanner, advisory IDs/aliases, source lockfile and database timestamps where present. It does not independently reimplement version-range matching. The OSV scan exit code is retained as an artifact. The current baseline is report-first, not a blanket release gate; a separate policy gate must be enabled after the repository's baseline is reviewed.
+
+## Coverage limitations
+- OSV is not every vulnerability database; no scanner can promise complete global CVE coverage.
+- Database freshness, ecosystem mappings, aliases, withdrawn advisories, platform markers, private registries and lockfile quality affect results.
+- CVE presence is not evidence that a vulnerable function is reachable.
+- A clean result with missing lockfiles or incomplete graph coverage is not a clean bill of health.
+- Review the scanner exit code, dependency graph, SBOM and advisory artifacts together.
