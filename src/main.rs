@@ -31,7 +31,7 @@ fn main() {
         Ok(mut a) => {
             if let Some(source)=evidence_file {
                 match fs::read_to_string(&source).and_then(|raw| a.evidence.load_json(&raw).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData,e))) {
-                    Ok(count) => println!("Loaded and verified {count} evidence records from {}",source.display()),
+                    Ok(count) => eprintln!("Loaded and verified {count} evidence records from {}",source.display()),
                     Err(e) => { eprintln!("Evidence ingestion failed: {e}"); std::process::exit(1); }
                 }
             }
