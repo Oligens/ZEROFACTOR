@@ -1,0 +1,16 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "$id":"https://zerofactor.invalid/schemas/evidence.schema.json",
+ "title":"ZEROFACTOR Evidence and Impact Record","type":"object",
+ "required":["evidence_id","assessment_id","test_id","classification","scope","observed_at","result","integrity"],
+ "properties":{
+  "evidence_id":{"type":"string","minLength":8},"assessment_id":{"type":"string","minLength":1},"test_id":{"type":"string","minLength":1},
+  "classification":{"enum":["static","simulated","reproduced","independently_verified"]},
+  "scope":{"type":"object","required":["authorization_id","target_fingerprint","expires_at"],"properties":{"authorization_id":{"type":"string"},"target_fingerprint":{"type":"string"},"expires_at":{"type":"string","format":"date-time"}},"additionalProperties":false},
+  "observed_at":{"type":"string","format":"date-time"},"result":{"enum":["pass","fail","inconclusive","not_run"]},
+  "preconditions":{"type":"array","items":{"type":"string"}},"expected":{"type":"string"},"observed":{"type":"string"},
+  "impact":{"type":"array","items":{"type":"object","required":["dimension","value","unit","method"],"properties":{"dimension":{"enum":["confidentiality","integrity","availability","privilege","blast_radius","persistence"]},"value":{"type":"number","minimum":0},"unit":{"type":"string"},"method":{"type":"string"},"sample_size":{"type":"integer","minimum":0},"confidence":{"type":"number","minimum":0,"maximum":1}},"additionalProperties":false}},
+  "cleanup":{"type":"object","properties":{"attempted":{"type":"boolean"},"verified":{"type":"boolean"},"details":{"type":"string"}}},
+  "integrity":{"type":"object","required":["sha256"],"properties":{"sha256":{"type":"string","pattern":"^[a-fA-F0-9]{64}$"},"artifact_uri":{"type":"string"},"tool_version":{"type":"string"},"host_fingerprint":{"type":"string"}},"additionalProperties":false}
+ },"additionalProperties":false
+}
