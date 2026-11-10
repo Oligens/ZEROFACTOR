@@ -4,7 +4,7 @@
 - Scope-gated gVisor launcher (sandbox/run-isolated.sh).
 - Host smoke-test script (sandbox/verify-host.sh) checks runtime selection, read-only mounts/root, Docker socket absence and basic limits.
 - Lockfile graph extractor and OSV result normalizer.
-- Evidence/impact record contract (schemas/evidence.schema.json).
+- Evidence/impact record contract (schemas/evidence.schema.json).\n- Assessment assembler (scripts/assemble_assessment.py) attaches advisory matches to findings and links evidence IDs and measured impact through finding_id.
 
 ## Safety model
 Dynamic checks are opt-in and must run only against disposable lab targets covered by unexpired written authorization. Current smoke tests are infrastructure checks, not penetration tests and not a sandbox escape certification. Never use production credentials or real user data.
