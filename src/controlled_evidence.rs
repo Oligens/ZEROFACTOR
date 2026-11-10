@@ -99,6 +99,7 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
         }
         let observed_at = required_string(raw, "observed_at")?.to_string();
         let expires_at = required_string(raw, "authorization_expires_at")?.to_string();
+        if expires_at != envelope_expiry { return Err("evidence record expiry does not match result envelope".into()); }
         let result = result_value(raw)?;
         let check = &checks[position];
         if required_string(check, "case_id")? != record_case || required_string(check, "result")? != required_string(raw, "result")? {
