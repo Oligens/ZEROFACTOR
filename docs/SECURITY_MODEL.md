@@ -1,5 +1,9 @@
 # Security model and safe operation
 
+## Current capability boundary
+
+The present engine performs repository inventory and selected static pattern inspection only. It does not query CVE/advisory databases, resolve the complete transitive dependency graph, execute target code, provide an isolated sandbox, or expose a dashboard. A missing finding must never be interpreted as a clean CVE result or a security certification.
+
 1. Obtain explicit written authorization before assessing a repository or system that is not yours.
 2. Treat every target file as untrusted data. Never execute build scripts, hooks, tests, package managers, or binaries during static scanning.
 3. The MVP is read-only and local. It does not clone repositories or contact network services.
