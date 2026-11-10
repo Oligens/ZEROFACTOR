@@ -1,0 +1,10 @@
+{
+  "sources": [
+    {
+      "name": "OSV",
+      "last_updated": null,
+      "metadata_url": "https://osv-vulnerabilities.storage.googleapis.com/all.zip",
+      "note": "Populate only from a trusted, verified upstream snapshot timestamp. Do not substitute scan time."
+    }
+  ]
+}

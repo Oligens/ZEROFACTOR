@@ -46,6 +46,8 @@ fn write_finding(out: &mut String, f: &Finding) {
     let _ = writeln!(out, "- **Recommendation:** {}\n", f.recommendation);
 }
 pub fn json(a: &Assessment) -> String {
+    let evidence_records=serde_json::to_string(&a.evidence.records).unwrap_or_else(|_|"[]".into());
+    let impact_summary=serde_json::to_string(&a.evidence.impact_summary()).unwrap_or_else(|_|"{}".into());
     let findings = a.findings.iter().map(|f| format!(
         "{{\"id\":{},\"category\":{},\"severity\":{},\"status\":{},\"title\":{},\"path\":{},\"line\":{},\"evidence\":{},\"recommendation\":{}}}",
         q(&f.id), q(&f.category), q(f.severity.as_str()), q(f.status.as_str()), q(&f.title), q(&f.path.display().to_string()),
@@ -60,10 +62,10 @@ pub fn json(a: &Assessment) -> String {
         "{{\"id\":{},\"description\":{},\"weight\":{},\"tested\":{},\"failure_factor\":{}}}",
         q(&c.id), q(&c.description), c.weight, c.tested, c.failure_factor
     )).collect::<Vec<_>>().join(",");
-    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}]}}",
+    format!("{{\"target\":{},\"files_examined\":{},\"files_skipped\":{},\"bytes_examined\":{},\"zfi\":{},\"coverage\":{},\"components\":[{}],\"dependencies\":[{}],\"findings\":[{}],\"checks\":[{}],\"warnings\":[{}],\"evidence_records\":{},\"impact_summary\":{}}",
         q(&a.root.display().to_string()), a.files_examined, a.files_skipped, a.bytes_examined,
         a.zfi().map(|v| v.to_string()).unwrap_or_else(|| "null".into()), a.coverage(), components, dependencies, findings, checks,
-        a.warnings.iter().map(|w| q(w)).collect::<Vec<_>>().join(","))
+        a.warnings.iter().map(|w| q(w)).collect::<Vec<_>>().join(","), evidence_records, impact_summary)
 }
 fn q(s: &str) -> String {
     let mut out = String::from("\"");
@@ -77,7 +79,7 @@ mod tests {
     use std::path::PathBuf;
     #[test] fn json_is_valid_shape_and_escapes_quotes() {
         let a = Assessment { root: PathBuf::from("/tmp/a"), files_examined: 1, files_skipped: 0, bytes_examined: 2,
-            findings: vec![], components: vec![], dependencies: vec![], checks: vec![Check { id: "x".into(), description: "a \"quote\"".into(), weight: 1.0, tested: true, failure_factor: 0.0 }], warnings: vec![] };
+            findings: vec![], components: vec![], dependencies: vec![], evidence: crate::evidence::EvidenceIndex::default(), checks: vec![Check { id: "x".into(), description: "a \"quote\"".into(), weight: 1.0, tested: true, failure_factor: 0.0 }], warnings: vec![] };
         let j = json(&a);
         assert!(j.contains("\\\"quote\\\""));
         assert!(j.starts_with("{"));

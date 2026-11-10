@@ -14,7 +14,7 @@ impl Default for ScanOptions { fn default() -> Self { Self { max_files: MAX_FILE
 pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessment> {
     let root = fs::canonicalize(root)?;
     if !root.is_dir() { return Err(io::Error::new(io::ErrorKind::InvalidInput, "scan target must be a directory")); }
-    let mut a = Assessment { root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0, findings: Vec::new(), components: Vec::new(), dependencies: Vec::new(), checks: Vec::new(), warnings: Vec::new() };
+    let mut a = Assessment { root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0, findings: Vec::new(), components: Vec::new(), dependencies: Vec::new(), checks: Vec::new(), warnings: Vec::new(), evidence: crate::evidence::EvidenceIndex::default() };
     let mut files = Vec::new();
     collect_files(&root, &root, options, &mut files, &mut a)?;
     files.sort();

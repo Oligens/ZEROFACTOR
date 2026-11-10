@@ -34,12 +34,13 @@ jobs:
           status=$?
           set -e
           echo "$status" > osv-scanner.exit-code
-          # OSV-Scanner returns a non-zero status when advisories are found.
-          # Preserve the report; fail only when the scanner itself could not complete.
           if [ "$status" -gt 1 ]; then exit "$status"; fi
       - name: Normalize exact-version advisory matches
         if: always() && hashFiles('osv-results.json') != ''
         run: python3 scripts/normalize_osv.py osv-results.json --output advisory-results.json
+      - name: Enforce CVE policy when trusted source metadata is supplied
+        if: always() && hashFiles('source-metadata.json') != ''
+        run: python3 scripts/cve_policy.py advisory-results.json --source-metadata source-metadata.json --output cve-policy-result.json
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@v0
         with:
@@ -62,6 +63,7 @@ jobs:
             osv-results.json
             osv-scanner.exit-code
             advisory-results.json
+            cve-policy-result.json
             sbom.spdx.json
             sbom.cdx.json
           if-no-files-found: warn
@@ -70,5 +72,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash -n sandbox/run-isolated.sh sandbox/verify-host.sh
-      - run: python3 -m unittest scripts/test_dependency_graph.py
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - run: test -s dashboard/index.html && test -s dashboard/app.js

@@ -1,4 +1,4 @@
-import json, pathlib, subprocess, tempfile, unittest
+import json,pathlib,subprocess,tempfile,unittest
 SCRIPT=pathlib.Path(__file__).with_name("dependency_graph.py")
 class LockGraphTests(unittest.TestCase):
  def run_script(self,files):
@@ -14,7 +14,15 @@ class LockGraphTests(unittest.TestCase):
  def test_npm_nested_package(self):
   d=self.run_script({"package-lock.json":json.dumps({"lockfileVersion":3,"packages":{"":{"name":"app"},"node_modules/a":{"version":"2.0.0","dependencies":{"b":"^1"}},"node_modules/a/node_modules/b":{"version":"1.2.0"}}})})
   self.assertEqual(next(x for x in d["packages"] if x["name"]=="a")["dependencies"],["b@1.2.0"])
- def test_poetry_exact_version(self):
+ def test_npm_v1_tree(self):
+  d=self.run_script({"package-lock.json":json.dumps({"lockfileVersion":1,"dependencies":{"a":{"version":"1.0.0","dependencies":{"b":{"version":"2.0.0"}}}}})})
+  self.assertEqual(next(x for x in d["packages"] if x["name"]=="a")["dependencies"],["b@2.0.0"])
+ def test_yarn_classic_edges(self):
+  lock='foo@^1.0.0:\n  version "1.2.0"\n  dependencies:\n    bar "^2.0.0"\n\nbar@^2.0.0:\n  version "2.1.0"\n'
+  d=self.run_script({"yarn.lock":lock})
+  self.assertEqual(next(x for x in d["packages"] if x["name"]=="foo")["dependencies"],["bar@2.1.0"])
+ def test_poetry_exact_version_inventory_is_explicitly_incomplete(self):
   d=self.run_script({"poetry.lock":'[[package]]\nname = "urllib3"\nversion = "2.2.1"\n'})
   self.assertEqual(d["packages"][0]["version"],"2.2.1")
+  self.assertFalse(d["graph_complete"])
 if __name__=="__main__":unittest.main()
