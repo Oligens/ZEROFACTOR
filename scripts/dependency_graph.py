@@ -10,7 +10,7 @@ def cargo(data):
     for p in rows:
         deps=[]; unresolved=[]
         for raw in p.get("dependencies",[]):
-            m=re.match(r"^(.+?) ([^ ]+)(?: \\((.+)\\))?$",raw)
+            m=re.match(r"^(.+?) ([^ ]+)(?: \((.+)\))?$",raw)
             if not m:
                 unresolved.append(raw); continue
             name,ver,src=m.group(1),m.group(2),m.group(3)
