@@ -24,7 +24,7 @@ $("createProject").addEventListener("click",()=>{if(!canAdmin())return;const nam
 $("deleteProject").addEventListener("click",()=>{if(!canAdmin()||state.projects.length<2)return;const p=project();if(!confirm("Delete project and its local assessment history?"))return;state.projects=state.projects.filter(x=>x.id!==p.id);save();current=null;renderWorkspace();$("notice").textContent="Local project deleted.";});
 $("reportFile").addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;if(!canWrite()){$("notice").textContent="Viewer profile: import disabled.";return;}try{const d=JSON.parse(await f.text());current=d;render(d);const p=project();p.assessments.unshift({label:f.name,createdAt:new Date().toISOString(),findings:(d.findings||[]).length,report:d});save();renderHistory();$("notice").textContent="Loaded and saved locally to "+p.name+": "+(d.target||f.name);}catch(err){$("notice").textContent="Invalid JSON: "+err.message;}finally{e.target.value="";}});
 function render(d){
- const fs=Array.isArray(d.findings)?d.findings:[],ds=Array.isArray(d.dependencies)?d.dependencies:[],cs=Array.isArray(d.checks)?d.checks:[];
+ const fs=Array.isArray(d.findings)?d.findings:[],ds=Array.isArray(d.resolved_dependencies)&&d.resolved_dependencies.length?d.resolved_dependencies:(Array.isArray(d.dependencies)?d.dependencies:[]),cs=Array.isArray(d.checks)?d.checks:[],ads=Array.isArray(d.advisory_matches)?d.advisory_matches:[],ev=Array.isArray(d.evidence_records)?d.evidence_records:[],imp=d.impact_summary||{};
  $("files").textContent=d.files_examined??"—";$("findings").textContent=fs.length;$("deps").textContent=ds.length;
  $("coverage").textContent=Number.isFinite(d.coverage)?(d.coverage*100).toFixed(1)+"%":"—";$("zfi").textContent=d.zfi==null?"N/A":Number(d.zfi).toFixed(1);
  const lv=["critical","high","medium","low","info"],counts=Object.fromEntries(lv.map(s=>[s,fs.filter(f=>String(f.severity).toLowerCase()===s).length])),mx=Math.max(1,...Object.values(counts));
@@ -32,6 +32,9 @@ function render(d){
  $("checks").className="check-list";$("checks").innerHTML=cs.map(c=>'<div class="check"><span>'+safe(c.description||c.id)+'</span><span class="tag">'+(c.tested?"TESTED":"NOT TESTED")+'</span></div>').join("")||"No check data";
  $("findingRows").innerHTML=fs.map(f=>'<tr><td class="severity '+safe(String(f.severity).toLowerCase())+'">'+safe(f.severity)+'</td><td>'+safe(f.title)+'</td><td>'+safe(f.status)+'</td><td>'+safe(f.path)+(f.line?":"+safe(f.line):"")+'</td></tr>').join("")||'<tr><td colspan="4">No findings recorded</td></tr>';
  $("depRows").innerHTML=ds.map(x=>'<tr><td>'+safe(x.ecosystem)+'</td><td>'+safe(x.name)+'</td><td>'+safe(x.version_spec||x.version)+'</td><td>'+safe(x.manifest||x.lockfile)+'</td></tr>').join("")||'<tr><td colspan="4">No dependencies parsed</td></tr>';
+ $("advisoryRows").innerHTML=ads.map(a=>'<tr><td>'+safe(a.package)+'</td><td>'+safe(a.resolved_version)+'</td><td>'+safe((a.advisory_ids||[]).join(", "))+'</td><td>'+safe(a.source_lockfile)+'</td></tr>').join("")||'<tr><td colspan="4">No advisory matches</td></tr>';
+ $("evidenceRows").innerHTML=ev.map(e=>'<div class="check"><span>'+safe(e.evidence_id)+' · '+safe(e.test_id)+' · '+safe(e.classification)+'</span><span class="tag">'+safe(e.result)+'</span></div>').join("")||"No evidence records.";
+ $("impactRows").innerHTML=Object.entries(imp).map(([k,v])=>'<div class="check"><span>'+safe(k)+' · '+safe(v.records)+' records</span><span>'+safe((v.measured_values||[]).map(x=>x.value+" "+x.unit).join(", "))+'</span></div>').join("")||"No impact measurements.";
  $("warnings").innerHTML=(Array.isArray(d.warnings)?d.warnings:[]).map(w=>'<li>'+safe(w)+'</li>').join("")||"<li>No warnings recorded.</li>";
 }
 renderWorkspace();
