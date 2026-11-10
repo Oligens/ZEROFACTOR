@@ -37,9 +37,8 @@
 
 ## Phase 4 — Evidence and platform
 - [x] Local JSON report dashboard foundation
-- [x] Evidence record contract linking test, scope, result and impact
+- [x] Browser-local project workspace and assessment history
 - [ ] Evidence records emitted and cryptographically verified by the engine
-- [ ] Multi-project workspaces and persistent assessment history
 - [ ] Server-side authentication, RBAC and tenant isolation
 - [ ] Signed evidence bundles and chain of custody
 - [ ] SARIF and professional PDF exports
@@ -48,4 +47,4 @@
 - [ ] Hosted dashboard, audit trail and operational monitoring
 
 ## Release gates
-A feature is not complete until automated tests pass, security controls are independently verified, artifacts are reproducible and limitations are explicit. A launcher does not prove host isolation; an advisory match does not prove exploitability; a browser-side role selector is not secure RBAC.
+A feature is not complete until automated tests pass, security controls are independently verified, artifacts are reproducible and limitations are explicit. A launcher does not prove host isolation; an advisory match does not prove exploitability; browser-side role selection is not secure RBAC.
