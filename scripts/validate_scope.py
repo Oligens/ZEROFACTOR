@@ -9,6 +9,7 @@ ALLOWED_MODULES = {"HTTP_POSTURE", "AUTH", "INPUT", "FILE", "TLS", "RATE", "RECO
 MAX_REQUESTS = 12
 MAX_TIMEOUT_SECONDS = 30
 
+
 def validate_scope(scope, now=None):
     if not isinstance(scope, dict):
         raise ValueError("scope must be a JSON object")
@@ -22,6 +23,9 @@ def validate_scope(scope, now=None):
         raise ValueError("authorization_id must contain at least 8 characters")
     if not isinstance(scope["owner"], str) or len(scope["owner"].strip()) < 3:
         raise ValueError("owner must identify the authorizing owner")
+    assessment_id = scope.get("assessment_id", "assessment-" + scope["authorization_id"])
+    if not isinstance(assessment_id, str) or not 1 <= len(assessment_id.strip()) <= 128:
+        raise ValueError("assessment_id must be a non-empty identifier of at most 128 characters")
     try:
         expiry = dt.datetime.fromisoformat(str(scope["expires_at"]).replace("Z", "+00:00"))
     except ValueError as exc:
@@ -58,15 +62,21 @@ def validate_scope(scope, now=None):
     routes = scope.get("allowed_routes", [])
     if not isinstance(routes, list) or len(routes) > 12:
         raise ValueError("allowed_routes must be a list of at most 12 routes")
+    route_ids = set()
     for route in routes:
         if not isinstance(route, dict) or not str(route.get("path", "")).startswith("/"):
             raise ValueError("each allowed route must have an absolute path")
         if route.get("method") not in ("GET", "HEAD"):
             raise ValueError("only GET and HEAD routes are permitted by default")
-        if not route.get("id"):
-            raise ValueError("each allowed route requires a stable id")
+        route_id = route.get("id")
+        if not isinstance(route_id, str) or not route_id or route_id in route_ids:
+            raise ValueError("each allowed route requires a unique stable id")
+        route_ids.add(route_id)
+        if "?" in route["path"] or "#" in route["path"] or "\\" in route["path"]:
+            raise ValueError("query strings, fragments and backslashes are forbidden in allowlisted paths")
     return {
         "authorization_id": scope["authorization_id"],
+        "assessment_id": assessment_id,
         "owner": scope["owner"],
         "target_origin": f"https://{target.netloc}",
         "expires_at": expiry.astimezone(dt.timezone.utc).isoformat(),
@@ -74,6 +84,7 @@ def validate_scope(scope, now=None):
         "request_budget": budget,
         "timeout_seconds": timeout,
     }
+
 
 def main():
     import argparse
@@ -88,6 +99,7 @@ def main():
     except Exception as exc:
         print(f"invalid_scope: {exc}")
         return 2
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
