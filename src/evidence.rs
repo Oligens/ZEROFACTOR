@@ -52,7 +52,7 @@ pub struct FindingEvidence {
     pub confirmed_failures: usize,
     pub impact: Vec<ImpactMeasurement>,
 }
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ImpactSummaryEntry {
     pub records: usize,
     pub measured_values: Vec<ImpactMeasurement>,
