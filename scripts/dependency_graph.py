@@ -3,7 +3,8 @@
 Native edge reconstruction: Cargo.lock, npm package-lock v1-v3, Yarn classic v1, Poetry.lock and uv.lock.
 Pipfile.lock and go.sum remain exact-version/checksum inventories only and are explicitly incomplete.
 """
-import argparse,json,pathlib,re,sys,tomllib\nimport yaml
+import argparse,json,pathlib,re,sys,tomllib
+import yaml
 
 def row(eco,name,version,source,deps=None,unresolved=None,**extra):
     unresolved=unresolved or []
@@ -443,7 +444,10 @@ def extract(path):
     if n in ("package-lock.json","npm-shrinkwrap.json"):return npm(json.loads(path.read_text()))
     if n=="composer.lock":return composer(json.loads(path.read_text()))
     if n=="Gemfile.lock":return gemfile_lock(path)
-    if n=="gradle.lockfile":return gradle_lock(path)\n    if n=="pnpm-lock.yaml":return pnpm_lock(path)\n    if n=="maven-dependency-tree.txt":return maven_tree(path)\n    if n=="gradle-dependencies.txt":return gradle_report(path)
+    if n=="gradle.lockfile":return gradle_lock(path)
+    if n=="pnpm-lock.yaml":return pnpm_lock(path)
+    if n=="maven-dependency-tree.txt":return maven_tree(path)
+    if n=="gradle-dependencies.txt":return gradle_report(path)
     if n=="yarn.lock":return yarn_classic(path)
     if n in ("poetry.lock","uv.lock"):return python_toml(tomllib.loads(path.read_text()),n)
     if n=="Pipfile.lock":return pipfile(json.loads(path.read_text()))
@@ -463,7 +467,9 @@ def main():
                 item["lockfile"]=str(p.relative_to(root));key=(item["ecosystem"],item["name"],item["version"],item["lockfile"],item["source"])
                 if key not in seen:found.append(item);seen.add(key)
         except Exception as e:errors.append({"lockfile":str(p.relative_to(root)),"error":str(e)})
-    complete=bool(files) and not errors and bool(found) and all(x.get("graph_complete",False) for x in found)\n    if any(p.name=="gradle.lockfile" for p in files) and not any(p.name=="gradle-dependencies.txt" for p in files):complete=False\n    if any(p.name=="pom.xml" for p in root.rglob("pom.xml")) and not any(p.name=="maven-dependency-tree.txt" for p in files):complete=False
+    complete=bool(files) and not errors and bool(found) and all(x.get("graph_complete",False) for x in found)
+    if any(p.name=="gradle.lockfile" for p in files) and not any(p.name=="gradle-dependencies.txt" for p in files):complete=False
+    if any(p.name=="pom.xml" for p in root.rglob("pom.xml")) and not any(p.name=="maven-dependency-tree.txt" for p in files):complete=False
     result={"schema_version":"1.1","target":str(root),"lockfiles_found":len(files),"packages":found,"package_count":len(found),"graph_complete":complete,
         "coverage":{"native_edge_formats":["Cargo.lock","npm package-lock v1-v3","pnpm-lock.yaml","Yarn classic v1","Yarn Berry v2+","Maven dependency:tree text report","Gradle dependencies text report","Poetry.lock","uv.lock","composer.lock","Gemfile.lock"],"inventory_only_formats":["Pipfile.lock","go.sum","gradle.lockfile"]},
         "limitations":["Maven and Gradle dependency reports must be generated externally and supplied as maven-dependency-tree.txt or gradle-dependencies.txt; ZEROFACTOR never runs target build tools.","Python duplicate package versions or unresolved dependency names keep graph_complete false; dependency constraints are not fully evaluated against PEP 440.","Pipfile.lock and go.sum do not encode complete dependency edges.","Private registries, platform markers, optional dependencies and omitted lockfiles can reduce coverage.","No package is installed and no target project code is executed."],"errors":errors}
