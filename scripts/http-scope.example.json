@@ -1,8 +1,17 @@
 {
   "authorization_id": "REPLACE-WITH-WRITTEN-AUTHORIZATION-ID",
+  "authorized": false,
+  "owner": "REPLACE-WITH-AUTHORIZING-OWNER",
   "assessment_id": "controlled-http-assessment-001",
   "target_url": "https://app.example.test/",
-  "allowed_hosts": ["app.example.test"],
+  "allowed_hosts": [
+    "app.example.test"
+  ],
   "expires_at": "2027-01-01T00:00:00Z",
+  "modules": [
+    "HTTP_POSTURE"
+  ],
+  "request_budget": 1,
+  "timeout_seconds": 8,
   "finding_ids": {}
 }
