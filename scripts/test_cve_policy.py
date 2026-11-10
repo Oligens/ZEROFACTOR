@@ -18,4 +18,16 @@ class PolicyTests(unittest.TestCase):
  def test_unversioned_match_is_review_not_block(self):
   result=evaluate({"sources":[],"matches":[{"package":"demo","severity_label":"critical"}]},{"allowed_sources":[]})
   self.assertFalse(result["passed"]);self.assertEqual(len(result["decisions"]["review"]),1)
+ def test_multi_source_match_is_blocked_once(self):
+  now=dt.datetime(2026,11,9,tzinfo=dt.timezone.utc)
+  data={"sources":[{"name":"OSV","last_updated":"2026-11-08T00:00:00Z"},{"name":"RustSec","last_updated":"2026-11-08T00:00:00Z"}],
+        "matches":[{"package":"demo","resolved_version":"1.2.3","version_match":True,"severity_label":"high","source":"OSV+RustSec","sources":["OSV","RustSec"]}]}
+  result=evaluate(data,{"max_database_age_days":7,"allowed_sources":["OSV","RustSec"],"required_sources":["OSV","RustSec"],"fail_on_or_above":"high"},now)
+  self.assertFalse(result["passed"]);self.assertEqual(len(result["decisions"]["block"]),1)
+  self.assertEqual(result["decisions"]["block"][0]["sources"],["OSV","RustSec"])
+ def test_missing_required_rustsec_metadata_fails_closed(self):
+  now=dt.datetime(2026,11,9,tzinfo=dt.timezone.utc)
+  result=evaluate({"sources":[{"name":"OSV","last_updated":"2026-11-08T00:00:00Z"}],"matches":[]},
+                  {"max_database_age_days":7,"allowed_sources":["OSV","RustSec"],"required_sources":["OSV","RustSec"]},now)
+  self.assertFalse(result["passed"]);self.assertTrue(any("RustSec" in x for x in result["source_errors"]))
 if __name__=="__main__":unittest.main()
