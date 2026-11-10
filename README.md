@@ -8,13 +8,13 @@ ZEROFACTOR evaluates whether security guarantees declared by a system are suppor
 
 ## Current status
 
-The repository intelligence MVP is merged into main. The current feature branch adds dependency lockfile graph extraction, OSV advisory normalization, a manual gVisor host smoke-test workflow, a structured evidence/impact schema and local project/history dashboard foundations.
+The repository inventory MVP and dependency/advisory foundations are merged into `main`. The current feature branch adds npm v1 and Yarn classic graph adapters, a fail-closed advisory severity/freshness policy, bounded HTTPS posture checks, typed Rust evidence aggregation, and a server-backed local dashboard with authentication and project-scoped roles.
 
-**These additions are not a claim that all platform objectives are complete.** Native graph extraction currently covers Cargo and npm dependency edges, with partial exact-version inventory for Poetry, uv, Pipfile and Go checksums. OSV-Scanner provides additional ecosystem coverage using its supported lockfile extractors. Full cross-ecosystem graph completeness, multi-database CVE coverage, reachability analysis, verified exploitability, independent gVisor escape validation, production penetration-test modules, cryptographic evidence chain of custody and secure hosted multi-user RBAC remain incomplete.
+**These additions are not a claim that all platform objectives are complete.** Native graph coverage remains incomplete for pnpm, Yarn Berry, Gradle, Maven, Composer, Bundler and other ecosystems. Python constraints are not fully evaluated; Pipfile.lock and go.sum are inventory-only. CVE freshness enforcement requires trusted upstream source metadata and currently gates OSV only; RustSec remains a separate audit. The gVisor host workflow has not been executed on a dedicated host. Controlled checks are passive HTTP posture checks, not a general penetration-testing engine. Production multi-user deployment and independently verified sandbox escape resistance remain future work.
 
 ## Quick start
 
-Requirements: Rust stable (edition 2021).
+Requirements: Rust stable (edition 2021), Python 3.11+.
 
 ```bash
 cargo test
@@ -22,51 +22,48 @@ cargo run -- scan --path ../atibon --format md --out reports/atibon-assessment.m
 cargo run -- scan --path ../atibon --format json --out reports/atibon-assessment.json
 ```
 
-Lockfile graph inventory (Python 3.11+):
-
+Lockfile inventory:
 ```bash
 python3 scripts/dependency_graph.py ../atibon --output reports/dependency-graph.json
 ```
+Review `graph_complete` and `limitations`; do not assume that a partial inventory is a complete graph.
 
-The extractor does not install packages or execute target code. Review the graph_complete field and limitations before relying on the result.
+Advisory policy (requires trusted source metadata):
+```bash
+python3 scripts/normalize_osv.py osv-results.json --output advisory-results.json
+python3 scripts/cve_policy.py advisory-results.json --source-metadata source-metadata.json --output cve-policy-result.json
+```
+The scan time and per-advisory modified timestamp are not a database freshness timestamp. Do not fabricate `source-metadata.json`.
 
-Combine static, dependency, advisory and evidence records into one dashboard-ready assessment:
+## Local dashboard API
 
 ```bash
-python3 scripts/assemble_assessment.py --report reports/assessment.json --dependencies reports/dependency-graph.json --advisories reports/advisory-results.json --evidence reports/evidence.json --output reports/assessment-platform.json
+python3 server/app.py
+python3 -m unittest discover -s server -p 'test_*.py'
 ```
+Open `http://127.0.0.1:8765/`. Accounts, project memberships, assessment history and roles are stored in SQLite. Roles are Owner, Analyst and Viewer. The API binds to loopback only and is not production-ready for public exposure.
 
-## Dependency and advisory checks
+## Controlled checks
 
-CI runs cargo-audit, OSV-Scanner, and generates SPDX JSON and CycloneDX JSON SBOM artifacts. Exact package versions, advisory IDs/aliases, source lockfile and scanner exit code are retained as workflow artifacts. The current OSV baseline is report-first; advisory matches do not automatically prove reachability or exploitability.
-
-See [dependency intelligence](docs/DEPENDENCY_INTELLIGENCE.md) for supported lockfiles, database limitations and interpretation.
+```bash
+python3 -m unittest discover -s scripts -p 'test_*.py'
+python3 scripts/controlled_tests.py --scope scripts/http-scope.json --checks security_headers cookie_flags --output reports/http-checks.json
+```
+The HTTP runner requires an unexpired authorization scope, exact HTTPS host allowlisting and uses GET-only passive checks. See [controlled testing](docs/CONTROLLED_TESTING.md).
 
 ## Isolated execution
 
-sandbox/run-isolated.sh requires Docker with gVisor runsc registered and refuses default-runtime fallback. It enforces no network, read-only target/root filesystem, dropped capabilities, seccomp, no-new-privileges, unprivileged execution and resource limits. It requires an explicit unexpired scope file and prebuilt image.
-
-A manual GitHub workflow can run sandbox/verify-host.sh on a dedicated self-hosted Linux runner labelled gvisor. **The smoke test is not a sandbox escape certification.** Independent escape, side-channel and resource-exhaustion testing on a dedicated VM remains required.
-
-## Evidence and controlled testing
-
-schemas/evidence.schema.json defines a record linking authorization scope, test ID, result classification, observed behavior, impact dimensions, cleanup and SHA-256 artifact integrity. Current dynamic verification is only a guarded sandbox foundation and host smoke test; a general-purpose penetration-test engine is not implemented.
-
-Only assess systems you own or are explicitly authorized to test. ZEROFACTOR never automatically modifies the assessed system.
-
-## Dashboard
-
-Open dashboard/index.html for local report viewing, browser-local projects and assessment history. The current role selector is a local UI convenience, **not secure RBAC or authentication**. Server-side identity, permissions, tenant isolation and encrypted persistent storage remain future work. See [dashboard limitations](docs/DASHBOARD.md).
+`sandbox/run-isolated.sh` requires Docker with gVisor runsc registered and refuses default-runtime fallback. It applies network, filesystem, capability and resource controls. The manual GitHub workflow requires a dedicated self-hosted Linux runner labelled `gvisor`. **The host smoke test has not been run here and is not a sandbox escape certification.**
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Security model](docs/SECURITY_MODEL.md)
 - [Roadmap](docs/ROADMAP.md)
-- [Dependency intelligence](docs/DEPENDENCY_INTELLIGENCE.md)
+- [Dependency intelligence and CVE policy](docs/DEPENDENCY_INTELLIGENCE.md)
 - [Controlled testing and evidence](docs/CONTROLLED_TESTING.md)
+- [Dashboard API and RBAC](docs/DASHBOARD.md)
 - [Sandbox instructions](sandbox/README.md)
-- [Dashboard instructions](docs/DASHBOARD.md)
 
 ## License
 
