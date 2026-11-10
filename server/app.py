@@ -1,7 +1,7 @@
 """Local-first ZEROFACTOR dashboard API: SQLite, scrypt passwords, opaque sessions and project-scoped RBAC.
 Bind to loopback only. This is a hardened development foundation, not a public multi-tenant deployment recipe.
 """
-import base64, hashlib, hmac, json, os, secrets, sqlite3, time
+import base64, hashlib, hmac, json, os, secrets, sqlite3, time\nfrom pathlib import Path
 from http.cookies import SimpleCookie
 from urllib.parse import unquote
 from wsgiref.simple_server import make_server
@@ -73,7 +73,7 @@ def app(environ,start):
             if token:db.execute("DELETE FROM sessions WHERE token_hash=?",(hashlib.sha256(token.value.encode()).hexdigest(),));db.commit()
             return response(start,"200 OK",{"logged_out":True},[("Set-Cookie","zf_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"),("Set-Cookie","zf_csrf=; SameSite=Strict; Path=/; Max-Age=0")])
         if not user:return response(start,"401 Unauthorized",{"error":"authentication_required"})
-        if path=="/api/projects" and method=="GET":
+        if path=="/api/me" and method=="GET":return response(start,"200 OK",{"user":{"id":user["id"],"email":user["email"]}})\n        if path=="/api/projects" and method=="GET":
             rows=db.execute("SELECT p.id,p.name,p.created_at,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=? ORDER BY p.created_at DESC",(user["id"],)).fetchall()
             return response(start,"200 OK",{"projects":[dict(x) for x in rows]})
         if path=="/api/projects" and method=="POST":
