@@ -19,7 +19,7 @@ Requirements: Rust stable (edition 2021), Python 3.11+.
 ```bash
 cargo test
 cargo run -- scan --path ../atibon --format md --out reports/atibon-assessment.md
-cargo run -- scan --path ../atibon --format json --out reports/atibon-assessment.json
+cargo run -- scan --path ../atibon --format json --evidence reports/evidence.json --out reports/atibon-assessment.json
 ```
 
 Lockfile inventory:
