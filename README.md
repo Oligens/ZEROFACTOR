@@ -31,7 +31,7 @@ The scan target must be a local directory. Only scan repositories you own or are
 
 ## What the first engine checks
 
-- Bounded local file inventory; skips common generated and vendored directories, symlinks, files over 1 MiB, and scans beyond the 20,000-file cap.
+- Bounded local file inventory and classification of top-level components (source, tests, backend, frontend, infrastructure, tooling, configuration, documentation); skips common generated and vendored directories, symlinks, files over 1 MiB, and scans beyond the 20,000-file cap.
 - Direct dependency declaration discovery for common Cargo, npm, Python requirements/Pipfile and Go manifests. This is inventory only, not a vulnerability/advisory audit or complete transitive dependency graph.
 - Environment-file presence and possible hard-coded secret patterns; values are redacted in reports.
 - Selected source-level heuristics for unsafe C string APIs, shell execution, dynamic evaluation, HTML insertion and disabled TLS verification.
