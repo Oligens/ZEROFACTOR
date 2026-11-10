@@ -37,8 +37,10 @@ def run(scope_path, output, selected):
     cookie_issues=[]
     if "cookie_flags" in selected:
         for value in cookie_values:
-            low=value.lower()
-            if value and ("secure" not in low or "httponly" not in low or "samesite" not in low): cookie_issues.append("cookie_missing_recommended_flags")
+            attributes=[part.strip() for part in value.split(";")]
+            flags={part.split("=",1)[0].strip().lower() for part in attributes[1:]}
+            if value and not {"secure","httponly","samesite"} <= flags:
+                cookie_issues.append("cookie_missing_recommended_flags")
     checks=[]
     if "security_headers" in selected: checks.append({"test_id":"HTTP-SEC-HEADERS","result":"fail" if missing else "pass","observed":{"missing_headers":missing},"impact":[{"dimension":"security_posture","value":len(missing),"unit":"missing_security_headers","method":"response_header_presence","confidence":0.95}]})
     if "cookie_flags" in selected: checks.append({"test_id":"HTTP-COOKIE-FLAGS","result":"fail" if cookie_issues else "pass","observed":{"issues":cookie_issues},"impact":[{"dimension":"session_hardening","value":len(cookie_issues),"unit":"cookies_without_recommended_flags","method":"set_cookie_header_review","confidence":0.7}]})
