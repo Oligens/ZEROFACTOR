@@ -26,7 +26,7 @@
 - [x] Scope-gated execution, GET-only requests, redirect refusal and response/time bounds
 - [x] Written module contracts for AUTH, INPUT, FILE, TLS, RATE and RECOVERY
 - [x] JSON Schema for explicit authorization scope, target hosts, modules and budgets
-- [ ] Runtime scope-schema validation before any network operation
+- [x] Runtime fail-closed scope validation before any network operation
 - [ ] Authentication/authorization read-only test module with synthetic identities
 - [ ] Benign input-validation boundary module
 - [ ] Read-only file metadata/access module
