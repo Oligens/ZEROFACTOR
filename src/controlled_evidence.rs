@@ -74,6 +74,9 @@ pub fn ingest_controlled_result(index: &mut EvidenceIndex, artifact: &Path, asse
         let evidence_id = required_string(raw, "evidence_id")?.to_string();
         let record_case = required_string(raw, "case_id")?.to_string();
         if !valid_case_id(&record_case) { return Err("invalid evidence case_id".into()); }
+        if staged_index.records.iter().any(|existing| existing.evidence_id == evidence_id) {
+            return Err(format!("duplicate evidence_id: {evidence_id}"));
+        }
         let authorization_id = required_string(raw, "authorization_id")?.to_string();
         let target_fingerprint = required_string(raw, "target_fingerprint")?.to_string();
         let observed_at = required_string(raw, "observed_at")?.to_string();
