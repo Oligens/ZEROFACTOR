@@ -10,6 +10,7 @@ import datetime as dt
 import hashlib
 import json
 import pathlib
+import re
 import sys
 import uuid
 
@@ -37,8 +38,8 @@ def _bool(value, label):
 
 
 def _safe_id(value, label):
-    if not isinstance(value, str) or not value or len(value) > 96:
-        raise ValueError(f"{label} must be a non-empty identifier of at most 96 characters")
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,95}", value):
+        raise ValueError(f"{label} must be a safe 1–96 character identifier")
     return value
 
 
