@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run a tiny allowlisted, non-destructive HTTP posture suite against explicitly authorized origins."""
-import argparse, datetime as dt, hashlib, json, pathlib, ssl, sys, time, urllib.error, urllib.parse, urllib.request, uuid
+import argparse, hashlib, json, pathlib, ssl, sys, time, urllib.error, urllib.request, uuid
+from validate_scope import validate_scope
 
 CHECKS = {"security_headers", "cookie_flags", "https_target_only"}
 MAX_CHECKS, MAX_BODY = 3, 65536
@@ -9,21 +10,19 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl): return None
 
 def run(scope_path, output, selected):
-    scope=json.loads(pathlib.Path(scope_path).read_text())
-    if not scope.get("authorization_id") or not scope.get("expires_at"): raise ValueError("authorization_id and expires_at are required")
-    expires=dt.datetime.fromisoformat(scope["expires_at"].replace("Z","+00:00"))
-    if expires.tzinfo is None: expires=expires.replace(tzinfo=dt.timezone.utc)
-    if expires <= dt.datetime.now(dt.timezone.utc): raise ValueError("authorization scope has expired")
-    base=scope.get("target_url",""); parsed=urllib.parse.urlparse(base)
-    allowed={str(x).lower() for x in scope.get("allowed_hosts",[])}
-    if parsed.scheme!="https" or not parsed.hostname or parsed.hostname.lower() not in allowed: raise ValueError("target must be HTTPS and its exact hostname must be in allowed_hosts")
-    if parsed.username or parsed.password or parsed.port not in (None,443): raise ValueError("credentials and non-standard ports are forbidden")
-    if not selected or len(selected)>MAX_CHECKS or not set(selected)<=CHECKS: raise ValueError("checks must be selected from the allowlist (maximum 3)")
+    scope=json.loads(pathlib.Path(scope_path).read_text(encoding="utf-8"))
+    validated=validate_scope(scope)
+    if "HTTP_POSTURE" not in validated["modules"]:
+        raise ValueError("scope must explicitly authorize the HTTP_POSTURE module")
+    base=scope["target_url"]
+    parsed=urllib.parse.urlsplit(base)
+    if not selected or len(selected)>MAX_CHECKS or not set(selected)<=CHECKS:
+        raise ValueError("checks must be selected from the allowlist (maximum 3)")
     opener=urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl.create_default_context()),NoRedirect())
     request=urllib.request.Request(base,headers={"User-Agent":"ZEROFACTOR-controlled-check/1.0","Accept":"text/html,application/json"},method="GET")
     started=time.monotonic()
     try:
-        with opener.open(request,timeout=8) as response:
+        with opener.open(request,timeout=min(8, validated["timeout_seconds"])) as response:
             body=response.read(MAX_BODY+1)
             if len(body)>MAX_BODY: body=body[:MAX_BODY]
             status=response.status; headers={k.lower():v for k,v in response.headers.items()}; cookie_values=response.headers.get_all("Set-Cookie") or []
