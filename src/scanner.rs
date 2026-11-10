@@ -37,29 +37,37 @@ pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessm
             dependency_files_seen = true;
             for (ecosystem, dep_name, version) in parse_dependencies(name, text) {
                 if seen_deps.insert(format!("{ecosystem}:{dep_name}:{version}")) {
-                    a.dependencies.push(Dependency { ecosystem: ecosystem.into(), name: dep_name, version_spec: version, manifest: rel.clone() });
+                    a.dependencies.push(Dependency { ecosystem, name: dep_name, version_spec: version, manifest: rel.clone() });
                 }
             }
         }
         if is_sensitive_env_file(name) {
             sensitive_config_seen = true;
-            push_finding(&mut a, "ZF-CONFIG-001", "configuration", Severity::High, FindingStatus::Observed,
-                "Environment file is present in the scanned repository", &rel, None,
-                "File presence observed; Git tracking and secret validity are not inferred.",
-                "Keep real environment files outside version control; commit only sanitized templates.");
+            push_finding(&mut a, Finding {
+                id: "ZF-CONFIG-001".into(), category: "configuration".into(), severity: Severity::High, status: FindingStatus::Observed,
+                title: "Environment file is present in the scanned repository".into(), path: rel.clone(), line: None,
+                evidence: "File presence observed; Git tracking and secret validity are not inferred.".into(),
+                recommendation: "Keep real environment files outside version control; commit only sanitized templates.".into(),
+            });
         }
         for (idx, line) in text.lines().enumerate() {
             let lower = line.to_ascii_lowercase();
             if looks_like_secret_assignment(&lower) || line.contains("-----BEGIN PRIVATE KEY-----") {
                 sensitive_config_seen = true;
-                push_finding(&mut a, "ZF-SECRET-001", "secrets", Severity::High, FindingStatus::NeedsReview,
-                    "Possible hard-coded secret or private key material", &rel, Some(idx + 1), &redact_line(line),
-                    "Verify the value without copying it into reports; rotate exposed credentials and use a secret manager.");
+                push_finding(&mut a, Finding {
+                    id: "ZF-SECRET-001".into(), category: "secrets".into(), severity: Severity::High, status: FindingStatus::NeedsReview,
+                    title: "Possible hard-coded secret or private key material".into(), path: rel.clone(), line: Some(idx + 1),
+                    evidence: redact_line(line),
+                    recommendation: "Verify the value without copying it into reports; rotate exposed credentials and use a secret manager.".into(),
+                });
             }
             if let Some((needle, severity, title, recommendation)) = validation_pattern(&lower) {
                 validation_patterns_seen = true;
-                push_finding(&mut a, "ZF-VALIDATION-001", "input_validation", severity, FindingStatus::NeedsReview,
-                    title, &rel, Some(idx + 1), &format!("Potential pattern: {needle}"), recommendation);
+                push_finding(&mut a, Finding {
+                    id: "ZF-VALIDATION-001".into(), category: "input_validation".into(), severity, status: FindingStatus::NeedsReview,
+                    title: title.into(), path: rel.clone(), line: Some(idx + 1),
+                    evidence: format!("Potential pattern: {needle}"), recommendation: recommendation.into(),
+                });
             }
         }
     }
@@ -121,7 +129,7 @@ fn parse_dependencies(filename: &str, content: &str) -> Vec<(String, String, Str
 fn parse_requirement(line: &str) -> Option<(String, String)> {
     let clean = line.split('#').next()?.trim();
     if clean.is_empty() || clean.starts_with('-') { return None; }
-    let end = clean.find(|c: char| matches!(c, '=' | '<' | '>' | '!' | '~' | ';' | '[')).unwrap_or(clean.len());
+    let end = clean.find(['=', '<', '>', '!', '~', ';', '[']).unwrap_or(clean.len());
     let name = clean[..end].trim();
     if !valid_package_name(name) { return None; }
     let version = clean[end..].trim();
@@ -157,9 +165,7 @@ fn validation_pattern(l: &str) -> Option<(&'static str, Severity, &'static str, 
         Some(("TLS verification disabled", Severity::High, "TLS certificate verification may be disabled", "Enable certificate verification and configure a trusted CA where necessary."))
     } else { None }
 }
-fn push_finding(a: &mut Assessment, id: &str, category: &str, severity: Severity, status: FindingStatus, title: &str, path: &Path, line: Option<usize>, evidence: &str, recommendation: &str) {
-    a.findings.push(Finding { id: id.into(), category: category.into(), severity, status, title: title.into(), path: path.to_path_buf(), line, evidence: evidence.into(), recommendation: recommendation.into() });
-}
+fn push_finding(a: &mut Assessment, finding: Finding) { a.findings.push(finding); }
 fn should_skip_dir(n: &str) -> bool {
     matches!(n, ".git" | "node_modules" | "target" | "vendor" | ".venv" | "venv" | "__pycache__" | ".next" | "dist" | "build" | ".terraform" | ".idea")
 }
