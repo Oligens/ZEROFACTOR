@@ -144,7 +144,6 @@ jobs:
           const payload = {
             key: 'DATABASE_URL',
             value: process.env.DATABASE_URL,
-            type: 'encrypted',
             target: ['preview'],
             gitBranch: branch,
             comment: `ZEROFACTOR isolated Neon database for PR ${process.env.GITHUB_REF_NAME || 'preview'}`,
@@ -154,11 +153,11 @@ jobs:
               method: 'PATCH',
               body: JSON.stringify(payload),
             });
-            console.log('Updated branch-scoped Vercel Preview DATABASE_URL.');
+            console.log('Updated branch-scoped Vercel Preview DATABASE_URL without changing its existing secret type.');
           } else {
             await request(`/v10/projects/${project}/env?${query}`, {
               method: 'POST',
-              body: JSON.stringify(payload),
+              body: JSON.stringify({ ...payload, type: 'encrypted' }),
             });
             console.log('Created branch-scoped Vercel Preview DATABASE_URL.');
           }
