@@ -293,7 +293,8 @@ def resolve_locator(name, spec, index):
     spec=str(spec or "").strip()
     if spec.startswith(("workspace:","link:","file:","portal:")):
         return None
-    wanted=spec.split("(",1)[0].split("_",1)[0]\n    if wanted.startswith("npm:"):wanted=wanted[4:]
+    wanted=spec.split("(",1)[0].split("_",1)[0]
+    if wanted.startswith("npm:"):wanted=wanted[4:]
     exact=[]
     for item in candidates:
         version=str(item.get("version",""))
