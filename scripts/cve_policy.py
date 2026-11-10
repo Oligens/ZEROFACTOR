@@ -27,11 +27,11 @@ def evaluate(data,policy,now=None):
     blockers=[];reviews=[];accepted=[]
     for match in data.get("matches",[]):
         package=match.get("package");version=str(match.get("resolved_version") or "")
-        source=match.get("source") or match.get("database") or "unknown";severity=str(match.get("severity_label") or "unknown").lower()
+        source=match.get("source") or match.get("database") or "unknown";match_sources=set(match.get("sources") or [source]);severity=str(match.get("severity_label") or "unknown").lower()
         exact=bool(package and version and match.get("version_match") is not False)
-        item={"package":package,"version":version,"severity":severity,"source":source,"exact_version":exact}
+        item={"package":package,"version":version,"severity":severity,"source":source,"sources":sorted(match_sources),"exact_version":exact}
         if not exact:reviews.append({**item,"reason":"Exact resolved package version missing or explicitly mismatched"});continue
-        if source not in allowed:reviews.append({**item,"reason":"Advisory source is not approved"});continue
+        if not match_sources or not match_sources.issubset(allowed):reviews.append({**item,"reason":"One or more advisory sources are not approved","sources":sorted(match_sources)});continue
         level=SEVERITY.get(severity)
         if level is None:reviews.append({**item,"reason":"Severity is unknown; manual review required"});continue
         if level>=threshold:blockers.append({**item,"decision":"block"})
