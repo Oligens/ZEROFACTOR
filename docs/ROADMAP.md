@@ -38,7 +38,7 @@
 ## Phase 4 — Evidence and platform
 - [x] Local JSON report dashboard foundation
 - [x] Browser-local project workspace and assessment history
-- [ ] Evidence records emitted and cryptographically verified by the engine
+- [x] Evidence records can be assembled and linked to findings with SHA-256 artifact verification when a local artifact path is supplied\n- [ ] Evidence records emitted automatically and cryptographically verified by the Rust engine
 - [ ] Server-side authentication, RBAC and tenant isolation
 - [ ] Signed evidence bundles and chain of custody
 - [ ] SARIF and professional PDF exports
