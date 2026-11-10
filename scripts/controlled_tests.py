@@ -2,7 +2,7 @@
 """Run a tiny allowlisted, non-destructive HTTP posture suite against explicitly authorized origins."""
 import argparse, datetime as dt, hashlib, json, pathlib, ssl, sys, time, urllib.error, urllib.parse, urllib.request, uuid
 
-CHECKS = {"security_headers", "cookie_flags", "https_redirect"}
+CHECKS = {"security_headers", "cookie_flags", "https_target_only"}
 MAX_CHECKS, MAX_BODY = 3, 65536
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -43,7 +43,7 @@ def run(scope_path, output, selected):
     checks=[]
     if "security_headers" in selected: checks.append({"test_id":"HTTP-SEC-HEADERS","result":"fail" if missing else "pass","observed":{"missing_headers":missing},"impact":[{"dimension":"exposure","value":len(missing),"unit":"missing_security_headers","method":"response_header_presence","confidence":"high"}]})
     if "cookie_flags" in selected: checks.append({"test_id":"HTTP-COOKIE-FLAGS","result":"fail" if cookie_issues else "pass","observed":{"issues":cookie_issues},"impact":[{"dimension":"session_hardening","value":len(cookie_issues),"unit":"cookies_without_recommended_flags","method":"set_cookie_header_review","confidence":"medium"}]})
-    if "https_redirect" in selected: checks.append({"test_id":"HTTP-HTTPS-ONLY","result":"pass","observed":{"scheme":"https","status":status},"impact":[]})
+    if "https_target_only" in selected: checks.append({"test_id":"HTTP-HTTPS-TARGET","result":"pass","observed":{"scheme":"https","status":status},"impact":[]})
     artifact_dir=pathlib.Path(output).with_suffix("").parent/"evidence-artifacts"; artifact_dir.mkdir(parents=True,exist_ok=True)
     artifact=artifact_dir/(uuid.uuid4().hex+".response"); artifact.write_bytes(body); digest=hashlib.sha256(body).hexdigest()
     target_fingerprint=hashlib.sha256((parsed.scheme+"://"+parsed.netloc).encode()).hexdigest()
