@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Extract lockfile package graphs without installing packages or executing project code.
-Native edge reconstruction: Cargo.lock, npm package-lock v1-v3, Yarn classic v1, Poetry.lock and uv.lock.
-Pipfile.lock and go.sum remain exact-version/checksum inventories only and are explicitly incomplete.
+Native graph adapters for Cargo, npm, pnpm, Yarn, Maven/Gradle reports, Python, PHP and Ruby.
+Formats without edge data remain explicitly incomplete.
 """
 import argparse,json,pathlib,re,sys,tomllib
 import yaml
@@ -274,6 +274,7 @@ def package_key(value):
         parts=value.split("/")
         if len(parts)<2:return None,None
         scope=parts[0];rest="/".join(parts[1:])
+        if len(parts)>=3 and re.match(r"^\d",parts[-1]):return "/".join(parts[:-1]),parts[-1]
         if "@" in rest:
             artifact,version=rest.rsplit("@",1)
             return scope+"/"+artifact,version
