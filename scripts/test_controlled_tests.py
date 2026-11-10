@@ -10,6 +10,6 @@ class ControlledTestSafety(unittest.TestCase):
  def test_rejects_expired_scope(self):
   with tempfile.TemporaryDirectory() as td:
    p=pathlib.Path(td)/"scope.json"
-   p.write_text(json.dumps({"authorization_id":"auth-test","target_url":"https://example.test/","allowed_hosts":["example.test"],"expires_at":"2000-01-01T00:00:00Z"}))
+   p.write_text(json.dumps({"authorization_id":"auth-test-0001","authorized":true,"owner":"Synthetic Test Owner","modules":["HTTP_POSTURE"],"target_url":"https://example.test/","allowed_hosts":["example.test"],"expires_at":"2000-01-01T00:00:00Z"}))
    with self.assertRaisesRegex(ValueError,"expired"):run(p,pathlib.Path(td)/"out.json",["security_headers"])
 if __name__=="__main__":unittest.main()
