@@ -100,3 +100,48 @@ Scanner exit code 1 means findings were reported; the findings are evaluated by 
 - A clean result with missing lockfiles or incomplete graph coverage is not a clean bill of health.
 - A generated Maven or Gradle report is only as complete as the configuration and environment used to produce it.
 - Review scanner exit codes, graph completeness, SBOM and advisory artifacts together.
+
+
+## Evidence provenance, integrity and chain of custody
+
+For every successful supply-chain assessment, CI creates `evidence-manifest.json`. The manifest binds the exact bytes and sizes of:
+
+- Dependency graph and lockfile-derived inventory.
+- Raw OSV and RustSec scanner outputs and exit codes.
+- Normalized advisory results and trusted source freshness records.
+- CVE policy decision.
+- SPDX and CycloneDX SBOMs.
+- Final assessment gate report.
+
+The manifest records UTC creation time, repository, commit SHA, workflow/run identifiers and optional previous-manifest hash. SHA-256 hashes are calculated over each artifact. A canonical JSON payload is itself hashed as `chain_hash`; the verifier checks both manifest integrity and every referenced artifact.
+
+CI signs the manifest using GitHub Artifact Attestations with GitHub Actions OIDC. This provides a verifiable signed provenance statement tied to the repository/workflow identity; it does not claim that the underlying scanner data is intrinsically correct, and it is not a replacement for retaining the run artifacts and repository audit history.
+
+Local verification:
+
+```bash
+python3 scripts/evidence_manifest.py --verify evidence-manifest.json
+```
+
+Verify the GitHub signature/provenance after downloading the manifest:
+
+```bash
+gh attestation verify evidence-manifest.json --repo Oligens/ZEROFACTOR
+```
+
+A previous manifest hash can be supplied as `ZEROFACTOR_PREVIOUS_EVIDENCE_HASH` when a trusted external evidence ledger is available. The CI workflow does not pretend to maintain a persistent cross-run append-only ledger by itself; GitHub attestations and retained run artifacts provide the signed per-run record.
+
+## Full graph / inventory / SBOM consistency gate
+
+The final gate now checks:
+
+1. Every graph package has an ecosystem, package name and exact resolved version.
+2. Every dependency edge has a package/version target present in the extracted inventory.
+3. No unresolved dependency references remain hidden behind a nominally complete graph.
+4. Each SPDX and CycloneDX document contains every graph package identity, matching package URLs where present and exact name/version as a fallback for SBOM entries without usable PURLs.
+5. Both SBOMs are valid formats and non-empty.
+6. Every normalized advisory has a package and exact resolved version before policy acceptance.
+
+The gate emits package/edge counts, SBOM match counts, missing graph identities and explicit failures in `assessment-gate.json`. Extra SBOM components may be present because SBOM generators can include the application root or build environment; they are retained and do not replace the requirement that every dependency-graph package is represented.
+
+A successful gate means the supplied graph and SBOM artifacts are internally reconcilable under these identity rules. It does not prove that every dependency was discovered: the existing lockfile/report coverage limitations remain in force, and an incomplete graph still fails closed.

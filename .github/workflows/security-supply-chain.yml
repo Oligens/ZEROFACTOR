@@ -7,6 +7,8 @@ on:
 permissions:
   contents: read
   security-events: write
+  id-token: write
+  attestations: write
 jobs:
   dependency-audit:
     runs-on: ubuntu-latest
@@ -82,6 +84,19 @@ jobs:
             --spdx sbom.spdx.json \
             --cyclonedx sbom.cdx.json \
             --output assessment-gate.json
+      - name: Create tamper-evident SHA-256 evidence manifest
+        run: |
+          python3 scripts/evidence_manifest.py --output evidence-manifest.json \
+            dependency-graph.json osv-results.json osv-scanner.exit-code \
+            rustsec-results.json rustsec-scanner.exit-code advisory-results.json \
+            osv-source-metadata.json rustsec-source-metadata.json source-metadata.json \
+            cve-policy-result.json sbom.spdx.json sbom.cdx.json assessment-gate.json
+      - name: Verify evidence manifest and every artifact hash
+        run: python3 scripts/evidence_manifest.py --verify evidence-manifest.json
+      - name: Sign evidence manifest with GitHub artifact attestation (OIDC)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: evidence-manifest.json
       - name: Upload dependency, advisory, policy, SBOM and gate evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -101,6 +116,7 @@ jobs:
             sbom.spdx.json
             sbom.cdx.json
             assessment-gate.json
+            evidence-manifest.json
           if-no-files-found: warn
   sandbox-preflight:
     runs-on: ubuntu-latest
