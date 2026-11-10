@@ -62,7 +62,7 @@ def validate(args):
         "required_checks": {
             "dependency_graph": "failed" if not graph.get("graph_complete") else "passed",
             "cve_policy": "passed" if policy.get("passed") is True else "failed",
-            "osv_scan": "passed" if int(args.osv_exit_code) in (0, 1) else "failed",
+            "osv_scan": "passed" if int(args.osv_exit_code) in (0, 1) else "failed",\n            "rustsec_scan": "passed" if rustsec_exit_code in (0, 1) else "failed",
             "spdx_sbom": "validated",
             "cyclonedx_sbom": "validated",
             "sbom_consistency": "validated" if len(sbom_sets) == 2 and sbom_sets[0][1] & sbom_sets[1][1] else "failed",
@@ -78,7 +78,7 @@ def main():
     parser.add_argument("--graph", required=True)
     parser.add_argument("--advisories", required=True)
     parser.add_argument("--policy-result", required=True)
-    parser.add_argument("--osv-exit-code", required=True, type=int)
+    parser.add_argument("--osv-exit-code", required=True, type=int)\n    parser.add_argument("--rustsec-exit-code", required=True, type=int)
     parser.add_argument("--spdx", required=True)
     parser.add_argument("--cyclonedx", required=True)
     parser.add_argument("--output", default="assessment-gate.json")
