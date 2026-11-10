@@ -1,4 +1,4 @@
-use crate::model::{Assessment, Check, Dependency, Finding, FindingStatus, Severity};
+use crate::model::{Assessment, Check, Component, Dependency, Finding, FindingStatus, Severity};
 use std::collections::BTreeSet;
 use std::fs;
 use std::io;
@@ -14,7 +14,7 @@ impl Default for ScanOptions { fn default() -> Self { Self { max_files: MAX_FILE
 pub fn scan_repository(root: &Path, options: &ScanOptions) -> io::Result<Assessment> {
     let root = fs::canonicalize(root)?;
     if !root.is_dir() { return Err(io::Error::new(io::ErrorKind::InvalidInput, "scan target must be a directory")); }
-    let mut a = Assessment { root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0, findings: Vec::new(), dependencies: Vec::new(), checks: Vec::new(), warnings: Vec::new() };
+    let mut a = Assessment { root: root.clone(), files_examined: 0, files_skipped: 0, bytes_examined: 0, findings: Vec::new(), components: Vec::new(), dependencies: Vec::new(), checks: Vec::new(), warnings: Vec::new() };
     let mut files = Vec::new();
     collect_files(&root, &root, options, &mut files, &mut a)?;
     files.sort();
@@ -166,6 +166,19 @@ fn validation_pattern(l: &str) -> Option<(&'static str, Severity, &'static str, 
     } else { None }
 }
 fn push_finding(a: &mut Assessment, finding: Finding) { a.findings.push(finding); }
+fn component_kind(name: &str) -> &'static str {
+    match name.to_ascii_lowercase().as_str() {
+        "src" | "core" | "lib" => "source",
+        "tests" | "test" | "__tests__" => "tests",
+        "docs" | "documentation" => "documentation",
+        "api" | "backend" | "server" | "services" => "backend",
+        "web" | "frontend" | "client" | "ui" => "frontend",
+        "infra" | "deploy" | "deployment" | ".github" | "terraform" | "k8s" => "infrastructure",
+        "scripts" | "tools" => "tooling",
+        "config" | "configs" => "configuration",
+        _ => "directory",
+    }
+}
 fn should_skip_dir(n: &str) -> bool {
     matches!(n, ".git" | "node_modules" | "target" | "vendor" | ".venv" | "venv" | "__pycache__" | ".next" | "dist" | "build" | ".terraform" | ".idea")
 }
@@ -179,7 +192,12 @@ fn collect_files(dir: &Path, root: &Path, options: &ScanOptions, out: &mut Vec<P
         let name = entry.file_name().to_string_lossy().to_string();
         if entry.file_type().map(|t| t.is_symlink()).unwrap_or(true) { a.files_skipped += 1; continue; }
         if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            if !should_skip_dir(&name) { collect_files(&path, root, options, out, a)?; }
+            if !should_skip_dir(&name) {
+                if path.parent() == Some(root) {
+                    a.components.push(Component { path: PathBuf::from(&name), kind: component_kind(&name).into() });
+                }
+                collect_files(&path, root, options, out, a)?;
+            }
         } else if entry.file_type().map(|t| t.is_file()).unwrap_or(false) { out.push(path); }
     }
     Ok(())
