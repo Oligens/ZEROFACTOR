@@ -36,21 +36,22 @@ def npm(data):
     lock_version=int(data.get("lockfileVersion",1));out=[]
     if lock_version==1:
         def walk(tree,location):
+            rows=[]
             for name,p in (tree or {}).items():
                 if not isinstance(p,dict) or not p.get("version"):continue
                 loc=(location+"/" if location else "")+"node_modules/"+name
-                child=walk(p.get("dependencies",{}),loc)
-                child_by_name={}
-                for x in child:child_by_name.setdefault(x["source"].split("node_modules/")[-1].split("/")[-1],[]).append(x)
+                child_rows=walk(p.get("dependencies",{}),loc)
+                child_by_path={x["source"]:x for x in child_rows}
                 deps=[];unresolved=[]
                 for dep in (p.get("dependencies") or {}):
-                    hits=child_by_name.get(dep,[])
-                    if len(hits)==1:deps.append(hits[0]["name"]+"@"+hits[0]["version"])
+                    direct_path=loc+"/node_modules/"+dep
+                    hit=child_by_path.get(direct_path)
+                    if hit:deps.append(hit["name"]+"@"+hit["version"])
                     else:unresolved.append(dep)
-                out.append(row("npm",name,p["version"],loc,sorted(set(deps)),unresolved,integrity=p.get("integrity")))
-                out.extend(child)
-        walk(data.get("dependencies",{}),"")
-        return out
+                rows.append(row("npm",name,p["version"],loc,sorted(set(deps)),unresolved,integrity=p.get("integrity")))
+                rows.extend(child_rows)
+            return rows
+        return walk(data.get("dependencies",{}),"")
     packages=data.get("packages")
     if not isinstance(packages,dict):raise ValueError("unsupported npm lockfile structure")
     keys=set(packages)
@@ -62,10 +63,16 @@ def npm(data):
         if not name:continue
         deps=[];unresolved=[]
         for dep in (p.get("dependencies") or {}):
-            base=(loc+"/" if loc else "")+"node_modules/"+dep
-            candidates=[k for k in keys if k==base or k.endswith("/"+base)]
-            if candidates:
-                candidate=sorted(candidates,key=len)[-1];q=packages[candidate]
+            parts=loc.split("/") if loc else []
+            candidate=None
+            while True:
+                base="/".join(parts+["node_modules",dep])
+                if base in keys:
+                    candidate=base;break
+                if not parts:break
+                parts=parts[:-2] if len(parts)>=2 and parts[-2]=="node_modules" else parts[:-1]
+            if candidate:
+                q=packages[candidate]
                 if q.get("version"):deps.append((q.get("name") or dep)+"@"+str(q["version"]))
                 else:unresolved.append(dep)
             else:unresolved.append(dep)
@@ -118,6 +125,9 @@ def python_toml(data,kind):
     out=[]
     for p in raw:
         if not isinstance(p,dict) or not p.get("name") or not p.get("version"):continue
+        if "dependencies" not in p:
+            deps=[];unresolved=["dependency_section_missing"]
+            out.append(row("PyPI",p["name"],p["version"],kind,deps,unresolved));continue
         rawdeps=p.get("dependencies",{})
         names=list(rawdeps.keys()) if isinstance(rawdeps,dict) else [x.get("name") for x in rawdeps if isinstance(x,dict) and x.get("name")] if isinstance(rawdeps,list) else []
         deps=[];unresolved=[]
