@@ -29,10 +29,23 @@ class ApiTests(unittest.TestCase):
   other_cookies,other_csrf=self.register_login("b@example.test")
   r,_=self.call("/api/projects/"+project["id"],cookies=other_cookies)
   self.assertTrue(r["status"].startswith("404"))
+  r,_=self.call("/api/projects/"+project["id"]+"/members","POST",{"email":"b@example.test","role":"viewer"},cookies,csrf)
+  self.assertTrue(r["status"].startswith("201"))
+  r,data=self.call("/api/projects","GET",cookies=other_cookies)
+  self.assertEqual(data["projects"][0]["role"],"viewer")
+  r,_=self.call("/api/projects/"+project["id"]+"/assessments","POST",{"label":"not allowed","report":{}},other_cookies,other_csrf)
+  self.assertTrue(r["status"].startswith("403"))
  def test_csrf_blocks_authenticated_mutation(self):
   cookies,_=self.register_login("csrf@example.test")
   r,_=self.call("/api/projects","POST",{"name":"blocked"},cookies)
   self.assertTrue(r["status"].startswith("403"))
+ def test_dashboard_home_served_by_same_origin_api(self):
+  env={"REQUEST_METHOD":"GET","PATH_INFO":"/","CONTENT_LENGTH":"0","wsgi.input":BytesIO(b"")}
+  got={}
+  def start(status,headers):got.update(status=status,headers=headers)
+  body=b"".join(app.app(env,start))
+  self.assertTrue(got["status"].startswith("200"))
+  self.assertIn(b"ZEROFACTOR",body)
  def test_short_password_is_rejected(self):
   r,_=self.call("/api/register","POST",{"email":"weak@example.test","password":"short"})
   self.assertTrue(r["status"].startswith("400"))
