@@ -193,11 +193,13 @@ async function handler(req, res) {
     }
 
     const user = await currentUser(req, client);
-    if (!user) return send(res, 401, { error: "authentication_required" });
 
+    // Session discovery is a public bootstrap check: an anonymous visitor is not an API error.
+    // Keep 401 for every protected endpoint; only /api/me returns an explicit unauthenticated state.
     if (pathname === "/api/me" && method === "GET") {
-      return send(res, 200, { user });
+      return send(res, 200, { user: user || null });
     }
+    if (!user) return send(res, 401, { error: "authentication_required" });
 
     if (pathname === "/api/projects" && method === "GET") {
       const result = await client.query(
